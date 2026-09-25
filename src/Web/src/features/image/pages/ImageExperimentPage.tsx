@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ExperimentDescription, RankMargin } from '../../../shared/components/ExperimentNotes'
 import { PromptMixWarning } from '../../../shared/components/PromptsUsed'
 import {
   applyImageCombo,
@@ -88,6 +89,7 @@ function Detail({ id }: { id: string }) {
         </span>
       </div>
       <Disclaimer />
+      <ExperimentDescription module="image" id={detail.id} description={detail.description} onSaved={load} />
 
       <section className="card progress-card">
         <div className="progress-head">
@@ -186,6 +188,7 @@ function Detail({ id }: { id: string }) {
             </tbody>
           </table>
         </div>
+        <RankMargin combos={detail.combos} sample={`영상 ${detail.docCount}장`} />
         <p className="muted small">
           점수: {detail.scoreFormula}. 모든 영상이 끝난 조합만 순위를 매깁니다. 시간 통계는 조합별 첫 작업(모델 적재 포함)을 뺀 값입니다.
         </p>

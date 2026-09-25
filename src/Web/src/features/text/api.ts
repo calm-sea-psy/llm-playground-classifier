@@ -123,6 +123,10 @@ export interface ComboResult {
   medianLlmSec: number | null
   score: number | null
   rank: number | null
+  /** 정답 있고 검증 통과한 문서 수 ➔ 그중 합계 틀림 · 필드 하나라도 틀림 */
+  passedLabeled: number
+  passedWrongTotal: number
+  passedWrongAny: number
 }
 
 export interface DocCell {
@@ -157,6 +161,8 @@ export interface ExperimentDetail {
   scoreFormula: string
   /** 같은 프롬프트가 실험 도중 다른 버전으로 쓰였으면 목록 */
   promptMixes?: PromptMix[]
+  /** 실험 설명 (문서를 어떻게 골랐는지 등) */
+  description?: string | null
 }
 
 export interface ExperimentSummary {
@@ -183,9 +189,10 @@ export const applyCombo = (id: string, index: number) =>
   sendJson<SettingsDto>(`/api/text/experiments/${id}/combos/${index}/apply`, 'POST')
 export const deleteExperiment = (id: string) => sendJson<void>(`/api/text/experiments/${id}`, 'DELETE')
 
-export const createExperiment = (name: string, files: File[], combos: PipelineSettings[]) => {
+export const createExperiment = (name: string, files: File[], combos: PipelineSettings[], description = '') => {
   const form = new FormData()
   form.append('name', name)
+  form.append('description', description)
   form.append('combos', JSON.stringify(combos))
   for (const file of files) form.append('files', file)
   return postForm<{ id: string; name: string; jobs: number }>('/api/text/experiments', form)

@@ -25,6 +25,7 @@ public static class ImageExperimentEndpoints
         group.MapPost("/", async (
             [FromForm] IFormFileCollection files,
             [FromForm] string? name,
+            [FromForm] string? description,
             [FromForm] string combos,
             ImageSettingsStore store,
             JobFactory factory,
@@ -42,6 +43,10 @@ public static class ImageExperimentEndpoints
             catch (JsonException ex)
             {
                 return Results.Problem($"조합 형식 오류: {ex.Message}", statusCode: StatusCodes.Status400BadRequest);
+            }
+            if (description?.Length > 2000)
+            {
+                return Results.Problem("설명은 2,000자 이하여야 합니다", statusCode: StatusCodes.Status400BadRequest);
             }
             if (files.Count is 0 or > MaxFiles)
             {
@@ -71,6 +76,7 @@ public static class ImageExperimentEndpoints
                 Id = Guid.CreateVersion7(),
                 JobType = ImageModule.ModuleKey,
                 Name = string.IsNullOrWhiteSpace(name) ? $"X-ray 실험 {clock.GetLocalNow():MM-dd HH:mm}" : name.Trim(),
+                Description = Clean(description),
                 Combos = JsonSerializer.Serialize(comboList, ImageSettings.Json),
                 DocCount = files.Count,
                 Environment = JsonSerializer.Serialize(new { env.Cpu, env.MemoryGb, env.Gpus, env.OllamaVersion },
@@ -130,9 +136,26 @@ public static class ImageExperimentEndpoints
             var detail = await scorer.ScoreAsync(experiment, ct);
             var combo = detail.Combos[index];
             var note = $"실험 '{experiment.Name}' ({experiment.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}) 조합 {index + 1}"
-                + (combo.Rank is { } rank ? $" · {rank}위 (점수 {combo.Score:0.000})" : "")
+                + (combo.Rank is { } rank ? $" · {rank}위 (적용 당시 점수 {combo.Score:0.000})" : "")
                 + (detail.RecommendedIndex == index ? " · 추천" : "");
             return Results.Json(await store.SetDefaultAsync(combos[index], note, ct), ImageSettings.Json);
+        });
+
+        // 실험 설명 고치기 (끝난 실험에도: 문서를 어떻게 골랐는지 등)
+        group.MapPut("/{id:guid}/description", async (Guid id, DescriptionRequest request, AppDbContext db, CancellationToken ct) =>
+        {
+            var experiment = await db.Set<Experiment>().FirstOrDefaultAsync(e => e.Id == id && e.JobType == ImageModule.ModuleKey, ct);
+            if (experiment is null)
+            {
+                return Results.NotFound();
+            }
+            if (request.Description?.Length > 2000)
+            {
+                return Results.Problem("설명은 2,000자 이하여야 합니다", statusCode: StatusCodes.Status400BadRequest);
+            }
+            experiment.Description = Clean(request.Description);
+            await db.SaveChangesAsync(ct);
+            return Results.NoContent();
         });
 
         group.MapDelete("/{id:guid}", async (Guid id, AppDbContext db, CancellationToken ct) =>
@@ -153,4 +176,6 @@ public static class ImageExperimentEndpoints
             return Results.NoContent();
         });
     }
+
+    private static string? Clean(string? text) => string.IsNullOrWhiteSpace(text) ? null : text.Trim();
 }

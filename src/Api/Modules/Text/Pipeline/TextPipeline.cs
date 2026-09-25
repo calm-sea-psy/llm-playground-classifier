@@ -151,7 +151,12 @@ public sealed class TextPipeline(LlmClient llm, TextPrompts prompts, IOptions<Pi
 
         // 수량 보정(영수증: 금액 = 단가인데 수량이 7 같은 값 ➔ 1)은 검증 전에 적용하고 경고로 남김
         List<ValidationIssue> issues = fields is null ? []
-            : [.. FieldValidator.CorrectQuantities(documentType, fields), .. FieldValidator.Validate(documentType, fields)];
+            : [
+                .. FieldValidator.CorrectQuantities(documentType, fields),
+                .. FieldValidator.Validate(documentType, fields),
+                // 근거 확인은 텍스트 추출만 (VLM 은 이미지를 직접 봄)
+                .. image is null ? FieldValidator.CheckGrounded(documentType, fields, document.Text) : [],
+            ];
         if (fields is not null)
         {
             NormalizeAmounts(documentType, fields);

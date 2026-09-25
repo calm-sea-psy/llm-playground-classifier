@@ -1435,3 +1435,43 @@ table.jobs {
   margin: 0.3rem 0 0;
   padding-left: 1.1rem;
 }
+
+/* 실험 설명 · 순위 차이 */
+.experiment-description {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  margin: -0.4rem 0 0.8rem;
+}
+.experiment-description p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.experiment-description.editing {
+  flex-direction: column;
+  align-items: stretch;
+}
+.experiment-description textarea,
+.name-field textarea {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.rank-margin {
+  margin: 0.6rem 0 0;
+}
+.rank-margin.is-close {
+  padding: 0.4rem 0.7rem;
+  border-radius: 8px;
+  background: var(--warn-soft);
+}
+.doc-compare {
+  /* 고정 헤더에 가리지 않게 */
+  scroll-margin-top: 5rem;
+}

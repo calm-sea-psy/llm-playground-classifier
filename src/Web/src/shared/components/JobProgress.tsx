@@ -29,13 +29,19 @@ export function JobProgress({ job, timeline, model }: { job: JobDto; timeline: T
     const timer = setInterval(() => setNow(new Date().toISOString()), 250)
     return () => clearInterval(timer)
   }, [finished])
-  const elapsed = elapsedSeconds(job.createdAt, finished ? (job.completedAt ?? job.updatedAt) : now)
+  // 대기열 대기와 실제 처리를 나눠 표시 (실험처럼 한꺼번에 넣으면 대기가 수백 초가 되어 처리 시간이 가려짐)
+  const end = finished ? (job.completedAt ?? job.updatedAt) : now
+  const waited = elapsedSeconds(job.createdAt, job.startedAt ?? end)
+  const processed = job.startedAt ? elapsedSeconds(job.startedAt, end) : null
 
   return (
     <section className="card progress-card" aria-live="polite">
       <div className="progress-head">
         <strong className={failed ? 'text-bad' : undefined}>{job.message ?? '대기 중'}</strong>
-        <span className="muted tabular">{elapsed.toFixed(1)}초</span>
+        <span className="muted tabular" title="처리 = 워커가 작업을 시작한 뒤, 대기 = 대기열에서 기다린 시간">
+          {processed === null ? `대기 ${waited.toFixed(1)}초` : `처리 ${processed.toFixed(1)}초`}
+          {processed !== null && waited >= 1 && <span className="small"> · 대기 {waited.toFixed(1)}초</span>}
+        </span>
       </div>
 
       <div

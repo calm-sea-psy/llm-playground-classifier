@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { jobFileUrl } from '../../../shared/api/jobs'
+import { ExperimentDescription, RankMargin } from '../../../shared/components/ExperimentNotes'
 import { PromptMixWarning } from '../../../shared/components/PromptsUsed'
 import {
   applyCombo,
@@ -70,6 +71,7 @@ function ExperimentDetailView({ id }: { id: string }) {
           {new Date(detail.createdAt).toLocaleString('ko-KR')} · 문서 {detail.docCount}장 × 조합 {detail.combos.length}개
         </span>
       </div>
+      <ExperimentDescription module="text" id={detail.id} description={detail.description} onSaved={load} />
 
       <section className="card progress-card">
         <div className="progress-head">
@@ -101,6 +103,11 @@ function ExperimentDetailView({ id }: { id: string }) {
                 {detail.labeled && <th className="num">필드 정확도</th>}
                 {detail.labeled && <th className="num">금액 정확도</th>}
                 <th className="num">검증 통과</th>
+                {detail.labeled && (
+                  <th className="num" title="검증을 통과한 문서 중 합계가 정답과 다른 문서 (검증 통과가 정답을 보장하지 않는 정도)">
+                    통과했지만 틀림
+                  </th>
+                )}
                 <th className="num">폴백</th>
                 <th className="num">작업 시간</th>
                 <th className="num hide-sm">OCR / LLM</th>
@@ -132,6 +139,20 @@ function ExperimentDetailView({ id }: { id: string }) {
                     )}
                     {detail.labeled && <td className="num tabular">{pct(c.amountAccuracy)}</td>}
                     <td className="num tabular">{pct(c.passRate)}</td>
+                    {detail.labeled && (
+                      <td
+                        className="num tabular"
+                        title={`정답 있는 문서 중 검증 통과 ${c.passedLabeled}건 ➔ 합계 틀림 ${c.passedWrongTotal}건 · 필드가 하나라도 틀림 ${c.passedWrongAny}건 (상호·시각 등 정의가 모호한 필드 포함)`}
+                      >
+                        {c.passedLabeled ? (
+                          <span className={c.passedWrongTotal > 0 ? 'text-warn' : undefined}>
+                            합계 {c.passedWrongTotal}/{c.passedLabeled}
+                          </span>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                    )}
                     <td className="num tabular">{pct(c.fallbackRate)}</td>
                     <td className="num tabular">{sec(c.medianJobSec)}</td>
                     <td className="num tabular small hide-sm">
@@ -159,6 +180,10 @@ function ExperimentDetailView({ id }: { id: string }) {
             </tbody>
           </table>
         </div>
+        <RankMargin
+          combos={detail.combos}
+          sample={detail.labeled ? `정답 있는 문서 ${Math.max(...detail.combos.map((c) => c.labeledDocs))}장` : `문서 ${detail.docCount}장 (정답 없음)`}
+        />
         <p className="muted small">
           점수: {detail.scoreFormula}. 모든 문서가 끝난 조합만 순위를 매깁니다.
         </p>
@@ -167,7 +192,7 @@ function ExperimentDetailView({ id }: { id: string }) {
 
       <section className="card">
         <h3>문서별 결과</h3>
-        <p className="muted small">행을 누르면 아래에 조합별 추출 결과를 나란히 보여 줍니다.</p>
+        <p className="muted small">행을 누르면 아래에 조합별 추출 결과를 나란히 보여 주고 그 위치로 이동합니다.</p>
         <div className="table-scroll">
           <table className="jobs doc-matrix">
             <thead>
@@ -232,10 +257,16 @@ function DocCompare({ detail, fileName }: { detail: ExperimentDetail; fileName: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
 
+  // 표가 길어 행을 누른 뒤 한참 내려야 보였음 ➔ 고른 문서가 바뀌면 이 패널로 이동
+  const panel = useRef<HTMLElement>(null)
+  useEffect(() => {
+    panel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [fileName])
+
   const firstJob = row?.cells.find(Boolean)?.jobId
   if (!row) return null
   return (
-    <section className="card">
+    <section className="card doc-compare" ref={panel}>
       <header className="panel-head">
         <h3>{fileName}</h3>
         <span className="small">

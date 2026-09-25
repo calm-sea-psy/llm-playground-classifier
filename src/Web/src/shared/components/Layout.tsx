@@ -14,7 +14,7 @@ export function Layout({ nav, children }: { nav: NavItem[]; children: ReactNode 
       <header className="app-header">
         <NavLink to="/" className="brand">
           <img src="/favicon.svg" alt="" width={22} height={22} />
-          OCR 오케스트레이션
+          LLM 도입 평가 도구
         </NavLink>
         {nav.length > 1 && (
           <nav>

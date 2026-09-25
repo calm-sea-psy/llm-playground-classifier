@@ -14,6 +14,8 @@ public sealed class Experiment
     /// <summary>실험한 모듈 키 (IPipelineModule.Key, 예: "text", "image")</summary>
     public required string JobType { get; set; }
     public required string Name { get; set; }
+    /// <summary>실험 설명 (문서를 어떻게 골랐는지 등 결과를 읽을 때 필요한 설계). 예: "신뢰도 0.9 미만 문서만 골라 폴백 100%"</summary>
+    public string? Description { get; set; }
     /// <summary>모듈의 설정 조합 목록 JSON</summary>
     public required string Combos { get; set; }
     public int DocCount { get; set; }
@@ -29,6 +31,7 @@ internal sealed class ExperimentConfiguration : IEntityTypeConfiguration<Experim
         b.ToTable("experiments");
         b.Property(e => e.JobType).HasMaxLength(32).HasDefaultValue("text");
         b.Property(e => e.Name).HasMaxLength(200);
+        b.Property(e => e.Description).HasMaxLength(2000);
         b.Property(e => e.Combos).HasColumnType("jsonb");
         b.Property(e => e.Environment).HasColumnType("jsonb");
         b.HasIndex(e => new { e.JobType, e.CreatedAt });

@@ -10,7 +10,10 @@ preload = ["paddleocr"]
 adapter = "engines.paddle:PaddleEngine"
 lang = "korean"                      # ➔ PP-OCRv5_server_det + korean_PP-OCRv5_mobile_rec
 device = "gpu:0"
-use_textline_orientation = true      # 기울어진·뒤집힌 줄 보정
+# 줄 방향 보정(180° 뒤집힌 줄 바로잡기)은 끔: 똑바른 영수증 줄을 오히려 뒤집어 읽음 ("1,000" ➔ "000'1").
+# 같은 150장 비교 (2026-09-25, eval/score_ocr.py): KORIE 필드 값 재현율 80.2% ➔ 84.8%, CER 7.56% ➔ 4.65%,
+# 상업송장 CER 0.70% ➔ 0.33%, 속도도 약간 빠름. 실제로 뒤집혀 찍힌 줄은 못 바로잡는 대신
+use_textline_orientation = false
 # 문서 방향 보정·왜곡 펴기는 이미지 자체를 바꿔 bbox 좌표계가 원본과 달라지므로 끔
 use_doc_orientation_classify = false
 use_doc_unwarping = false
@@ -22,7 +25,7 @@ max_pixels = 8_500_000
 adapter = "engines.structure:PaddleStructureEngine"
 lang = "korean"
 device = "gpu:0"
-use_textline_orientation = true
+use_textline_orientation = false   # 경로 A 와 같은 이유로 끔
 use_table_recognition = true
 use_region_detection = true
 max_pixels = 8_500_000

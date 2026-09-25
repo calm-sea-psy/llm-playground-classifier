@@ -39,6 +39,7 @@ export function ImageComparePage() {
   const [error, setError] = useState<string | null>(null)
 
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [combos, setCombos] = useState<ImageSettings[]>([])
   const [submitting, setSubmitting] = useState(false)
@@ -75,7 +76,7 @@ export function ImageComparePage() {
     setSubmitting(true)
     setError(null)
     try {
-      const created = await createImageExperiment(name.trim(), files, combos)
+      const created = await createImageExperiment(name.trim(), files, combos, description.trim())
       navigate(`/image/experiments/${created.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -140,6 +141,16 @@ export function ImageComparePage() {
         <label className="small name-field">
           실험 이름
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: IU 성인 30장 VLM 독립 vs CNN 참고" maxLength={200} />
+        </label>
+        <label className="small name-field">
+          실험 설명 (선택)
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            maxLength={2000}
+            placeholder="문서를 어떻게 골랐는지, 무엇을 확인하려는지 (예: 신뢰도 0.9 미만 문서만 골라 폴백 기준 비교)"
+          />
         </label>
         <MultiDropzone accept={ACCEPT} files={files} onFiles={setFiles} disabled={submitting} max={MAX_FILES} />
         {options && (

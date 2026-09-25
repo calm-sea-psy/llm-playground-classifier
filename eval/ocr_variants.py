@@ -4,6 +4,7 @@
 - paddle_ko        : 서비스 기본 (PP-OCRv5, lang=korean)
 - paddle_en        : lang=en (상업송장 = 영어 문서용 후보)
 - paddle_ko_unwarp : lang=korean + 문서 왜곡 펴기(use_doc_unwarping)
+- paddle_ko_noorient : lang=korean + 줄 방향 보정(use_textline_orientation) 끔 — 똑바른 줄을 180° 뒤집는 경우 확인용
 - easyocr_koen     : EasyOCR ['ko','en'] (별도 venv: torch 와 paddle 을 한 venv 에 두지 않음)
 
 모든 변형은 서비스와 같게 8.5MP 초과 이미지를 축소해서 인식하고 bbox 는 원본 좌표로 되돌린다.
@@ -59,16 +60,16 @@ def shrink(image: np.ndarray):
 
 
 class Paddle:
-    def __init__(self, lang: str, unwarp: bool, device: str):
+    def __init__(self, lang: str, unwarp: bool, device: str, orient: bool = True):
         from paddleocr import PaddleOCR
         sys.path.insert(0, str(REPO / "src" / "OcrService"))
         from engines.gpu import release_cached_memory
         self._release = release_cached_memory
-        self._ocr = PaddleOCR(lang=lang, device=device, use_textline_orientation=True,
+        self._ocr = PaddleOCR(lang=lang, device=device, use_textline_orientation=orient,
                               use_doc_orientation_classify=False, use_doc_unwarping=unwarp)
         det = self._ocr.paddlex_pipeline.text_det_model.model_name
         rec = self._ocr.paddlex_pipeline.text_rec_model.model_name
-        self.model = f"{det}+{rec}" + ("+UVDoc" if unwarp else "")
+        self.model = f"{det}+{rec}" + ("+UVDoc" if unwarp else "") + ("" if orient else " (줄 방향 보정 끔)")
 
     def __call__(self, image):
         res = self._ocr.predict(image)[0]
@@ -93,6 +94,7 @@ def make(variant: str, device: str):
         "paddle_ko": lambda: Paddle("korean", False, device),
         "paddle_en": lambda: Paddle("en", False, device),
         "paddle_ko_unwarp": lambda: Paddle("korean", True, device),
+        "paddle_ko_noorient": lambda: Paddle("korean", False, device, orient=False),
         "easyocr_koen": lambda: EasyOcr(["ko", "en"], device),
     }[variant]()
 

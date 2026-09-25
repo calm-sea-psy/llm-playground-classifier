@@ -61,7 +61,8 @@ public sealed record ImageExperimentDetailDto(
     List<ImageDocRowDto> Docs,
     string ScoreFormula,
     // 같은 프롬프트가 실험 도중 다른 버전으로 쓰였으면 목록 (결과가 섞였을 수 있음)
-    IReadOnlyList<PromptMix> PromptMixes);
+    IReadOnlyList<PromptMix> PromptMixes,
+    string? Description = null);
 
 public sealed record ImageExperimentSummaryDto(
     Guid Id,
@@ -207,7 +208,7 @@ public sealed class ImageExperimentScorer(AppDbContext db, ImageLabels labels)
             experiment.Id, experiment.Name, experiment.CreatedAt, experiment.DocCount,
             done == jobs.Count ? "Completed" : "Running", done, jobs.Count,
             experiment.Environment is null ? null : JsonNode.Parse(experiment.Environment),
-            anyLabeled, comboResults, recommended, docs, Formula, PromptUsage.Mixed(jobs.Select(j => j.Prompts)));
+            anyLabeled, comboResults, recommended, docs, Formula, PromptUsage.Mixed(jobs.Select(j => j.Prompts)), experiment.Description);
     }
 
     public static ImageExperimentSummaryDto Summarize(ImageExperimentDetailDto d) => new(

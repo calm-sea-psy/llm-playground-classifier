@@ -28,7 +28,11 @@ public sealed record ComboResultDto(
     double? MedianOcrSec,
     double? MedianLlmSec,
     double? Score,
-    int? Rank);
+    int? Rank,
+    /// <summary>정답이 있고 검증을 통과한 문서 수 ➔ 그중 합계가 틀린 수 · 필드가 하나라도 틀린 수 (검증 통과가 정답을 보장하지 않는 정도)</summary>
+    int PassedLabeled = 0,
+    int PassedWrongTotal = 0,
+    int PassedWrongAny = 0);
 
 public sealed record DocCellDto(
     Guid JobId,
@@ -57,7 +61,8 @@ public sealed record ExperimentDetailDto(
     IReadOnlyList<DocRowDto> Docs,
     string ScoreFormula,
     // 같은 프롬프트가 실험 도중 다른 버전으로 쓰였으면 목록 (결과가 섞였을 수 있음)
-    IReadOnlyList<PromptMix> PromptMixes);
+    IReadOnlyList<PromptMix> PromptMixes,
+    string? Description = null);
 
 public sealed record ExperimentSummaryDto(
     Guid Id,
@@ -80,7 +85,9 @@ public sealed record ExperimentSummaryDto(
 public sealed class ExperimentScorer(AppDbContext db, KorieLabels labels)
 {
     public const string Formula =
-        "정답 라벨이 있으면 0.6×필드 정확도 + 0.3×검증 통과율 + 0.1×속도, 없으면 0.8×검증 통과율 + 0.2×속도 (속도 = min(1, 10초 ÷ 작업 시간 중앙값). 시간 통계는 조합별 첫 작업(모델 적재 포함)을 뺀 값";
+        "정답 라벨이 있으면 0.6×필드 정확도 + 0.3×검증 통과율 + 0.1×속도, 없으면 0.8×검증 통과율 + 0.2×속도 (속도 = min(1, 10초 ÷ 작업 시간 중앙값). "
+        + "검증 통과 = 오류(Error)가 없는 것 — 경고(Warning, 예: 품목 합 < 합계)는 통과로 봄. 실패한 작업은 통과 못 한 것으로 셈. "
+        + "시간 통계는 조합별 첫 작업(모델 적재 포함)을 뺀 값";
 
     public async Task<ExperimentDetailDto> ScoreAsync(Experiment experiment, CancellationToken ct)
     {
@@ -99,6 +106,7 @@ public sealed class ExperimentScorer(AppDbContext db, KorieLabels labels)
         {
             var comboJobs = jobs.Where(j => j.ComboIndex == i).ToList();
             int passed = 0, fallback = 0, correct = 0, labeled = 0, amountCorrect = 0, amountLabeled = 0, labeledDocs = 0;
+            int passedLabeled = 0, passedWrongTotal = 0, passedWrongAny = 0;
             var jobSec = new List<double>();
             var ocrSec = new List<double>();
             var llmSec = new List<double>();
@@ -129,6 +137,13 @@ public sealed class ExperimentScorer(AppDbContext db, KorieLabels labels)
                     correct += docCorrect.Value;
                     labeled += docLabeled.Value;
                     labeledDocs++;
+                    if (r.ValidationPassed == true)
+                    {
+                        passedLabeled++;
+                        passedWrongAny += docCorrect < docLabeled ? 1 : 0;
+                        passedWrongTotal += truth.TryGetValue("total", out var t)
+                            && !KorieLabels.IsCorrect("total", t, fields?["total"]?.ToString()) ? 1 : 0;
+                    }
                 }
                 double? seconds = job is { StartedAt: { } s, CompletedAt: { } c } ? (c - s).TotalSeconds : null;
                 if (job.Status == JobStatus.Completed && r is not null)
@@ -162,7 +177,7 @@ public sealed class ExperimentScorer(AppDbContext db, KorieLabels labels)
                 i, combos[i], combos[i].Summary, comboJobs.Count, completed, failed, comboJobs.Count - finished,
                 passRate, completed > 0 ? (double)fallback / completed : null, accuracy,
                 amountLabeled > 0 ? (double)amountCorrect / amountLabeled : null, labeledDocs,
-                median, Median(ocrSec), Median(llmSec), score, null));
+                median, Median(ocrSec), Median(llmSec), score, null, passedLabeled, passedWrongTotal, passedWrongAny));
         }
 
         // 순위: 모든 문서가 끝난 조합만 (진행 중인 조합은 점수가 바뀔 수 있음)
@@ -179,7 +194,7 @@ public sealed class ExperimentScorer(AppDbContext db, KorieLabels labels)
             experiment.Id, experiment.Name, experiment.CreatedAt, experiment.DocCount,
             done == jobs.Count ? "Completed" : "Running", done, jobs.Count,
             experiment.Environment is null ? null : JsonNode.Parse(experiment.Environment),
-            anyLabeled, comboResults, recommended, docs, Formula, PromptUsage.Mixed(jobs.Select(j => j.Prompts)));
+            anyLabeled, comboResults, recommended, docs, Formula, PromptUsage.Mixed(jobs.Select(j => j.Prompts)), experiment.Description);
     }
 
     public static ExperimentSummaryDto Summarize(ExperimentDetailDto d) => new(

@@ -60,6 +60,51 @@ public static partial class FieldValidator
         return fixes;
     }
 
+    /// <summary>
+    /// 근거 확인(텍스트 추출 결과만): 영수증의 날짜·시각·합계·사업자번호 숫자가 OCR 텍스트에 실제로 있는지.
+    /// OCR 이 그 줄을 깨뜨리면 LLM 이 그럴듯한 값을 지어냄 (IMG00090: 인쇄 23-02-26 20:32 ➔ 추출 2024-01-01 00:00, 형식은 맞아 통과했음).
+    /// B_korie 텍스트 결과에서 이 규칙에 걸린 값은 날짜 2/2·시각 7/7·합계 4/4 모두 실제로 틀림 ➔ Error (VLM 폴백으로 이미지에서 다시 확인).
+    /// VLM 결과는 이미지를 직접 보므로 적용하지 않는다
+    /// </summary>
+    public static List<ValidationIssue> CheckGrounded(string documentType, JsonObject fields, string ocrText)
+    {
+        var issues = new List<ValidationIssue>();
+        if (documentType != DocumentTypes.Receipt)
+        {
+            return issues;
+        }
+        // 줄마다 숫자만 남김 (+ 다음 줄과 이은 것: 값이 줄바꿈으로 나뉜 경우)
+        var lines = ocrText.Split('\n').Select(l => NonDigitRegex().Replace(l, "")).Where(l => l.Length > 0).ToList();
+        var haystack = lines.Concat(lines.Zip(lines.Skip(1), (a, b) => a + b)).ToList();
+        bool Found(IEnumerable<string> candidates) => candidates.Any(c => haystack.Any(h => h.Contains(c, StringComparison.Ordinal)));
+        void Check(string field, string label, IEnumerable<string>? candidates, string value)
+        {
+            if (candidates is not null && !Found(candidates))
+            {
+                issues.Add(new("grounded", field, IssueSeverity.Error, $"{label} {value} 이(가) OCR 텍스트에 없습니다 (지어낸 값 의심)"));
+            }
+        }
+
+        if (Text(fields["date"]) is { } date && DateOnly.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+        {
+            // 2023-02-26 ➔ 20230226 · 230226 · 2023226 · 23226 (영수증은 23-02-26, 2023.2.26 등으로 인쇄)
+            Check("date", "날짜", [$"{d:yyyyMMdd}", $"{d:yyMMdd}", $"{d.Year}{d.Month}{d.Day}", $"{d:yy}{d.Month}{d.Day}"], date);
+        }
+        if (Text(fields["time"]) is { } time && TimeRegex().IsMatch(time))
+        {
+            Check("time", "시각", [time[..2] + time[3..5]], time);
+        }
+        if (Amount(fields["total"]) is { } total && total > 0 && total == decimal.Truncate(total))
+        {
+            Check("total", "합계", [((long)total).ToString(CultureInfo.InvariantCulture)], $"{total:N0}");
+        }
+        if (Text(fields["business_no"]) is { } businessNo && NonDigitRegex().Replace(businessNo, "") is { Length: 10 } digits)
+        {
+            Check("business_no", "사업자등록번호", [digits], businessNo);
+        }
+        return issues;
+    }
+
     private static List<ValidationIssue> ValidateReceipt(JsonObject f)
     {
         var issues = new List<ValidationIssue>();
@@ -282,6 +327,9 @@ public static partial class FieldValidator
 
     [GeneratedRegex(@"^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$")]
     private static partial Regex TimeRegex();
+
+    [GeneratedRegex(@"\D")]
+    private static partial Regex NonDigitRegex();
 
     [GeneratedRegex(@"[\s,원₩$]")]
     private static partial Regex AmountNoiseRegex();

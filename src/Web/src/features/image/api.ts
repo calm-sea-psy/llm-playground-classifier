@@ -146,6 +146,8 @@ export interface ImageExperimentDetail {
   scoreFormula: string
   /** 같은 프롬프트가 실험 도중 다른 버전으로 쓰였으면 목록 */
   promptMixes?: PromptMix[]
+  /** 실험 설명 (문서를 어떻게 골랐는지 등) */
+  description?: string | null
 }
 
 export interface ImageExperimentSummary {
@@ -170,9 +172,10 @@ export const applyImageCombo = (id: string, index: number) =>
   sendJson<ImageSettingsDto>(`/api/image/experiments/${id}/combos/${index}/apply`, 'POST')
 export const deleteImageExperiment = (id: string) => sendJson<void>(`/api/image/experiments/${id}`, 'DELETE')
 
-export const createImageExperiment = (name: string, files: File[], combos: ImageSettings[]) => {
+export const createImageExperiment = (name: string, files: File[], combos: ImageSettings[], description = '') => {
   const form = new FormData()
   form.append('name', name)
+  form.append('description', description)
   form.append('combos', JSON.stringify(combos))
   for (const file of files) form.append('files', file)
   return postForm<{ id: string; name: string; jobs: number }>('/api/image/experiments', form)

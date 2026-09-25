@@ -139,6 +139,49 @@ public class FieldValidatorTests
     }
 
     [Fact]
+    public void OCR_텍스트에_있는_값은_근거_확인을_통과()
+    {
+        const string ocr = "판매일:23-02-26 20:32,일요일\n408-86-16530 이권형\n합계 4,800";
+        var fields = Json("""{ "date": "2023-02-26", "time": "20:32", "total": 4800, "business_no": "408-86-16530" }""");
+        Assert.Empty(FieldValidator.CheckGrounded(DocumentTypes.Receipt, fields, ocr));
+    }
+
+    [Fact]
+    public void OCR_텍스트에_없는_값은_지어낸_값으로_오류()
+    {
+        // IMG00090: 줄이 뒤집혀 읽혀 날짜 줄이 깨지자 LLM 이 2024-01-01 00:00 을 만들어 냄
+        const string ocr = "200: 2:09-70-82:\n~1011-282-0 10 08991-98-80\n합계 4,800";
+        var fields = Json("""{ "date": "2024-01-01", "time": "00:00", "total": 4800, "business_no": "124-81-00998" }""");
+        var issues = FieldValidator.CheckGrounded(DocumentTypes.Receipt, fields, ocr);
+        Assert.Equal(["business_no", "date", "time"], issues.Select(i => i.Field).Order());
+        Assert.All(issues, i => Assert.Equal(IssueSeverity.Error, i.Severity));
+    }
+
+    [Theory]
+    [InlineData("2023.2.26 20:32")]
+    [InlineData("2023년 2월 26일")]
+    [InlineData("거래일시 20230226")]
+    public void 날짜는_인쇄_형식이_달라도_찾는다(string printed)
+    {
+        var fields = Json("""{ "date": "2023-02-26" }""");
+        Assert.Empty(FieldValidator.CheckGrounded(DocumentTypes.Receipt, fields, printed));
+    }
+
+    [Fact]
+    public void 줄바꿈으로_나뉜_값도_찾는다()
+    {
+        var fields = Json("""{ "business_no": "408-86-16530" }""");
+        Assert.Empty(FieldValidator.CheckGrounded(DocumentTypes.Receipt, fields, "사업자 408-86-\n16530"));
+    }
+
+    [Fact]
+    public void 근거_확인은_영수증에만()
+    {
+        var fields = Json("""{ "invoice_date": "2024-01-01" }""");
+        Assert.Empty(FieldValidator.CheckGrounded(DocumentTypes.CommercialInvoice, fields, "no date"));
+    }
+
+    [Fact]
     public void 송장_통화_코드와_합성_데이터용_산술_경고()
     {
         var issues = FieldValidator.Validate(DocumentTypes.CommercialInvoice, Json("""

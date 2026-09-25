@@ -92,3 +92,7 @@ src/OcrService/.venv/Scripts/python eval/run_eval.py --run korie150 --models qwe
 src/OcrService/.venv/Scripts/python eval/score_eval.py --run korie150
 ```
 결과: `eval/results/korie150/` (summary.md, summary.csv, fields.csv, items.csv, raw/ — git 제외)
+
+## 후속 (2026-09-25): OCR 줄 방향 보정 끔 + 근거 확인 규칙
+
+이 리포트의 수치는 PaddleOCR `use_textline_orientation = true` 로 측정했습니다. 이 옵션이 똑바른 영수증 줄을 180° 뒤집어 읽는 문제를 찾아 끈 뒤, gemma4:12b 로 150장을 다시 측정했습니다 (품질 개선 B 단계 이후 결과와 비교). 텍스트 단계 필드 정확도 59.7% ➔ 62.6%, 합계 90.9% ➔ 92.3%, 폴백 45.3% ➔ 32.7%, 검증 통과했지만 합계 틀림 12 ➔ 9건. 자세한 과정은 [평가 가이드](evaluation-guide.md#사례-오답을-따라가-ocr-설정-문제를-찾음-2026-09-25)에 있습니다. qwen3-vl 은 다시 측정하지 않았습니다.
