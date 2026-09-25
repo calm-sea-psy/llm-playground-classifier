@@ -48,7 +48,7 @@ public sealed partial class PromptStore(IServiceScopeFactory scopes, TimeProvide
         ["image/report.user"] = ("흉부 X-ray VLM 판독 — 대상·CNN 결과(보여 줄 때) 전달", false),
         ["multimodal/summarize.system"] = ("소견서 요약 — 지시문 (소견별 언급 규칙)", true),
         ["multimodal/summarize.user"] = ("소견서 요약 — 소견서 텍스트 전달", false),
-        ["multimodal/summarize.glossary"] = ("소견서 요약 용어집 (RAG) — 소견서에 나온 용어의 정의만 요약 지시문에 붙임", false),
+        ["multimodal/summarize.glossary"] = ("소견서 요약 용어집 (키워드 트리거) — 소견서에 나온 용어의 정의만 요약 지시문에 붙임", false),
         ["multimodal/synthesize.system"] = ("환자 종합 보고서 — 지시문", true),
         ["multimodal/synthesize.user"] = ("환자 종합 보고서 — 요약·CNN·VLM·일치 비교 전달", false),
     };

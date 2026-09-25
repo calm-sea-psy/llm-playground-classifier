@@ -5,7 +5,8 @@ using Api.Shared.Prompts;
 namespace Api.Modules.Multimodal.Pipeline;
 
 /// <summary>
-/// 소견서 요약용 용어집 (2차-6, 가장 단순한 RAG): 소견서에 나온 용어의 정의만 키워드(정규식)로 찾아 system 프롬프트에 붙인다.
+/// 소견서 요약용 키워드 트리거 용어집 (2차-6, RAG 의 가장 단순한 형태): 소견서에 나온 용어의 정의만 정규식으로 찾아 system 프롬프트에 붙인다.
+/// 임베딩 검색이 아닌 이유: 결정적·감사 가능(붙인 정의를 작업에 기록)·인프라 없음, 용어 10여 개 규모.
 /// 내용은 PromptStore 의 "multimodal/summarize.glossary" (UI 에서 적용한 버전, 없으면 Prompts/summarize.glossary.json).
 /// eval/summary_variants.py 도 같은 파일을 씀
 /// </summary>

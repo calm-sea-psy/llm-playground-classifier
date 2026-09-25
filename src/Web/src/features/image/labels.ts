@@ -30,3 +30,7 @@ export function sourceName(source: string) {
   const model = engine === 'pneumonia' ? '소아 폐렴 모델' : engine === 'xrv' ? 'xrv 소견 모델' : engine
   return `${model} · ${findingName(label)}`
 }
+
+/** 기준값 바로 위(+0.02 미만) 양성 = 경계(판단 보류). API CnnFinding.Borderline 과 같은 규칙 (xrv 소견만, 기준 0.9 이상 제외) */
+export const isBorderline = (f: { probability: number; threshold: number; positive: boolean }) =>
+  f.positive && f.threshold < 0.9 && f.probability < f.threshold + 0.02

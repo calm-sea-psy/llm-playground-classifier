@@ -123,7 +123,7 @@ public sealed class MultimodalModule : IPipelineModule
                 Concordance = JsonNode.Parse(r.Concordance),
                 FinalReport = r.FinalReport is null ? null : JsonNode.Parse(r.FinalReport),
                 Issues = JsonNode.Parse(r.Issues),
-                // 소견서 요약 때 프롬프트에 붙인 용어 정의 (2차-6 용어집 RAG, 적용 전 작업은 null)
+                // 소견서 요약 때 프롬프트에 붙인 용어 정의 (2차-6 키워드 트리거 용어집, 적용 전 작업은 null)
                 Glossary = JsonNode.Parse(r.Steps)?["summary"]?["glossary"]?.DeepClone(),
                 r.NeedsReview,
                 r.LlmElapsedMs,

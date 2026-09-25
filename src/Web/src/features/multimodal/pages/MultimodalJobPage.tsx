@@ -69,8 +69,8 @@ function ConcordanceTable({ rows }: { rows: ConcordanceRow[] }) {
             <tr key={r.key} className={r.agree === false ? 'disagree' : undefined}>
               <td>{r.name}</td>
               <td>{yesNo(r.report)}</td>
-              <td>
-                {yesNo(r.cnn, '양성', '음성')}
+              <td title={r.cnnBorderline ? '기준값 +0.02 이내: 대부분 틀려 판단 보류 (소견서와 비교·보고서 핵심 소견에서 뺌)' : undefined}>
+                {r.cnnBorderline ? <span className="chip">경계</span> : yesNo(r.cnn, '양성', '음성')}
                 {r.cnnProbability != null && <span className="muted small"> {r.cnnProbability.toFixed(2)}</span>}
               </td>
               <td>{r.key === 'pneumonia' ? yesNo(r.vlm, '의심', '의심 아님') : <span className="muted small">—</span>}</td>

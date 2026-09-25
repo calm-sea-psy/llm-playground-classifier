@@ -1475,3 +1475,11 @@ table.jobs {
   /* 고정 헤더에 가리지 않게 */
   scroll-margin-top: 5rem;
 }
+/* 소견 경계 (기준값 +0.02 이내, 판단 보류) */
+.finding-bars li.borderline .finding-name {
+  color: var(--warn);
+}
+.finding-bars li.borderline .fill {
+  background: var(--warn);
+  opacity: 0.6;
+}

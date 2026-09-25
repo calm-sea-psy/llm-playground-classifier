@@ -15,6 +15,8 @@ think off, num_ctx 16384, num_predict 4096). 영상은 쓰지 않고 소견서 �
 
 사용: src/OcrService/.venv/Scripts/python eval/summary_variants.py --sets dev test --variants base rag fewshot both
       (--score 만 주면 채점만)
+      용어집 새 버전: 프롬프트 화면에서 v1 을 적용한 뒤 --variants rag@v1 (API 의 적용 버전을 읽음, 번호가 다르면 중단)
+      같은 설정 반복(흔들림 측정): 꼬리표 "#r2" 를 붙임 (예: rag#r2, rag@v2#r2). temperature 0 이어도 Ollama 결과가 호출마다 달라질 수 있음
 """
 import argparse
 import csv
@@ -60,10 +62,27 @@ SCHEMA = {
     "required": ["indication", "key_symptoms", "findings", "final_diagnosis", "normal", "mentions"],
 }
 
-# 용어집 (지식 베이스): 키워드 정규식 ➔ 정의. 소견서에 키워드가 있으면 그 항목만 프롬프트에 붙인다
-# API 와 같은 파일을 씀 (운영 반영 후, 실험 당시 내용과 동일)
-GLOSSARY = [(e["pattern"], e["text"]) for e in
-            json.loads((PROMPTS / "summarize.glossary.json").read_text(encoding="utf-8"))["entries"]]
+# 용어집 (키워드 트리거): 정규식 ➔ 정의. 소견서에 키워드가 있으면 그 항목만 프롬프트에 붙인다
+# 기본 = 저장소 파일(v0). 변형 이름에 "@vN" 을 붙이면 API 에서 지금 적용 중인 버전을 읽고, 그 번호가 N 인지 확인 (운영과 같은 조건)
+API = "http://127.0.0.1:5000"
+
+
+def parse_glossary(content: str):
+    return [(e["pattern"], e["text"]) for e in json.loads(content)["entries"]]
+
+
+GLOSSARY = parse_glossary((PROMPTS / "summarize.glossary.json").read_text(encoding="utf-8"))
+
+
+def use_api_glossary(tag: str):
+    """tag = "v1" ➔ API 의 적용 버전이 v1 인지 확인하고 그 내용으로 바꿈"""
+    global GLOSSARY
+    d = json.load(urllib.request.urlopen(f"{API}/api/prompts/multimodal/summarize.glossary"))
+    active = d["info"].get("activeVersion")
+    if f"v{active}" != tag:
+        sys.exit(f"API 용어집 적용 버전이 v{active} 입니다 (요청: {tag}). 프롬프트 화면에서 {tag} 를 적용한 뒤 다시 실행하세요")
+    GLOSSARY = parse_glossary(d["content"])
+    print(f"용어집: API 적용 버전 {tag} ({len(GLOSSARY)}항목)")
 
 FEWSHOT = """
 예시 (판단 방식만 참고, 내용은 실제 소견서를 따를 것)
@@ -81,6 +100,7 @@ def retrieve(report: str) -> list[str]:
 
 def system_prompt(variant: str, report: str) -> tuple[str, int]:
     base = (PROMPTS / "summarize.system.md").read_text(encoding="utf-8").strip()
+    variant = variant.split("#")[0].split("@")[0]  # "rag@v2#r2" ➔ "rag"
     hits = retrieve(report) if variant in ("rag", "both") else []
     parts = [base]
     if hits:
@@ -151,6 +171,8 @@ def run(sets, variants, model):
         (OUT / s).mkdir(parents=True, exist_ok=True)
         (OUT / s / "items.json").write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
         for v in variants:
+            if "@" in v:
+                use_api_glossary(v.split("#")[0].split("@")[1])
             path = OUT / s / f"{model.replace(':', '_')}__{v}.jsonl"
             done = {json.loads(line)["uid"] for line in open(path, encoding="utf-8")} if path.exists() else set()
             with open(path, "a", encoding="utf-8") as out:

@@ -76,7 +76,7 @@ flowchart LR
     Xray --> VlmStep["VLM 독립 판독<br/>(CNN 결과를 보지 않음)"]
     CnnStep --> Cross{"교차 검증<br/>폐렴 판단이 다르면 사람 확인"}
     VlmStep --> Cross
-    Report["소견서<br/>(텍스트 또는 이미지 ➔ OCR)"] --> Summary["소견서 요약 (LLM)<br/>+ 용어집 RAG"]
+    Report["소견서<br/>(텍스트 또는 이미지 ➔ OCR)"] --> Summary["소견서 요약 (LLM)<br/>+ 키워드 트리거 용어집"]
     Cross --> Compare{"소견별 일치 비교<br/>소견서 vs CNN vs VLM"}
     Summary --> Compare
     Compare --> Final["환자 종합 보고서 (LLM)<br/>주어진 정보만, 불일치는 명시"]

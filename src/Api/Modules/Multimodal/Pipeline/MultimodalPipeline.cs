@@ -27,7 +27,9 @@ public sealed record ConcordanceRow(
     double? CnnProbability,
     string? CnnLabel,
     bool? Vlm,
-    bool? Agree);
+    bool? Agree,
+    /// <summary>CNN 이 기준값 바로 위(경계) ➔ 판단 보류, 소견서와 비교하지 않음</summary>
+    bool CnnBorderline = false);
 
 public sealed record MultimodalIssue(string Rule, IssueSeverity Severity, string Message);
 
@@ -119,9 +121,10 @@ public sealed class MultimodalPipeline(LlmClient llm, MultimodalPrompts prompts,
             bool? report = mentions?[key]?.GetValue<bool>();
             var finding = cnnLabel is null ? image.Pneumonia : image.Findings.Find(cnnLabel);
             bool? vlm = key == "pneumonia" ? vlmPneumonia : null;
-            bool? agree = report is { } r && finding is { } f ? r == f.Positive : null;
+            var borderline = finding?.Borderline == true;
+            bool? agree = report is { } r && finding is { } f && !borderline ? r == f.Positive : null;
             rows.Add(new ConcordanceRow(key, name, report, finding?.Positive, finding?.Probability,
-                finding?.Label, vlm, agree));
+                finding?.Label, vlm, agree, borderline));
             if (agree == false)
             {
                 issues.Add(new($"report_vs_cnn:{key}", key == "pneumonia" ? IssueSeverity.Error : IssueSeverity.Warning,
@@ -148,10 +151,15 @@ public sealed class MultimodalPipeline(LlmClient llm, MultimodalPrompts prompts,
         sb.AppendLine("## CNN 자동 분석 (확률, 판정 기준 이상이면 양성)");
         if (image.Pneumonia is { } p)
         {
-            sb.AppendLine($"- 폐렴 신호({image.Source}): {p.Probability:0.00} (기준 {p.Threshold:0.###}) ➔ {(p.Positive ? "양성" : "음성")}");
+            sb.AppendLine($"- 폐렴 신호({image.Source}): {p.Probability:0.00} (기준 {p.Threshold:0.###}) ➔ {(p.Borderline ? "경계(판단 보류)" : p.Positive ? "양성" : "음성")}");
         }
-        var positives = image.Findings.Positives.ToList();
+        var positives = image.Findings.DefinitePositives.ToList();
+        var borderlines = image.Findings.Findings.Where(f => f.Borderline).ToList();
         sb.AppendLine($"- 양성 소견: {(positives.Count == 0 ? "없음" : string.Join(", ", positives.Select(ImagePipeline.Describe)))}");
+        if (borderlines.Count > 0)
+        {
+            sb.AppendLine($"- 경계(판단 보류, 기준값 바로 위라 대부분 틀림 ➔ 핵심 소견·가능성으로 적지 말 것): {string.Join(", ", borderlines.Select(ImagePipeline.Describe))}");
+        }
         sb.AppendLine();
         sb.AppendLine("## VLM 판독 초안 (영상만 보고 독립 판독)");
         sb.AppendLine(image.Report?.Report is { } r
@@ -164,6 +172,7 @@ public sealed class MultimodalPipeline(LlmClient llm, MultimodalPrompts prompts,
             sb.AppendLine($"- {row.Name}: 소견서 {Mark(row.Report)} / CNN {Mark(row.Cnn)}"
                 + (row.CnnProbability is { } prob ? $" ({prob:0.00})" : "")
                 + (row.Key == "pneumonia" ? $" / VLM {Mark(row.Vlm)}" : "")
+                + (row.CnnBorderline ? " (CNN 경계, 판단 보류)" : "")
                 + (row.Agree == false ? " ➔ 불일치" : ""));
         }
         return sb.ToString();

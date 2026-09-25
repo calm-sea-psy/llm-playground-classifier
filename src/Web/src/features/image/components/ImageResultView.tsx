@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getImageResult, type CnnFinding, type ImageResult } from '../api'
 import { findingName, POPULATION_NAMES, sourceName } from '../labels'
 import { HeatmapViewer, type HeatmapLayer } from './HeatmapViewer'
+import { isBorderline } from '../labels'
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 
@@ -14,7 +15,11 @@ function FindingBars({ findings }: { findings: CnnFinding[] }) {
     <>
       <ul className="finding-bars">
         {visible.map((f) => (
-          <li key={f.label} className={f.positive ? 'positive' : undefined} title={`${f.label} · 기준 ${f.threshold}`}>
+          <li
+            key={f.label}
+            className={isBorderline(f) ? 'borderline' : f.positive ? 'positive' : undefined}
+            title={`${f.label} · 기준 ${f.threshold}${isBorderline(f) ? ' · 경계(기준값 +0.02 이내, 판단 보류)' : ''}`}
+          >
             <span className="finding-name">
               {findingName(f.label)} <span className="muted small">{f.label}</span>
             </span>

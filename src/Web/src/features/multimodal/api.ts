@@ -22,6 +22,8 @@ export interface ConcordanceRow {
   cnnLabel?: string | null
   vlm?: boolean | null
   agree?: boolean | null
+  /** CNN 이 기준값 바로 위(경계) ➔ 판단 보류, 비교하지 않음 */
+  cnnBorderline?: boolean
 }
 
 export interface FinalReport {

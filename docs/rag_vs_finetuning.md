@@ -5,6 +5,8 @@
 - **결론: LLM(텍스트) 쪽은 파인튜닝하지 않는다. 용어·필드 정의를 넣는 RAG + 코드 검증 + 사람 확인으로 간다.**
   **파인튜닝이 값을 하는 곳은 "영상을 보는 눈"(CNN/VLM) 쪽이며, 이미 소아 폐렴 CNN 에 적용했다.**
 
+> 용어: 이 리포트의 "RAG" 는 임베딩 검색이 아니라 **키워드(정규식) 트리거 용어집**입니다. 소견서에 나온 용어의 정의만 찾아 붙이는, RAG 의 가장 단순한 형태입니다. 결정적이고(같은 입력엔 같은 정의), 작업마다 붙인 정의가 기록되며, 벡터 DB 가 필요 없습니다.
+
 ## 1. 판단 기준
 
 todo 4번 ㅂ)에서 정한 기준을 그대로 썼다.
@@ -127,3 +129,7 @@ src/OcrService/.venv/Scripts/python eval/summary_variants.py --score
 src/OcrService/.venv/Scripts/python eval/summary_variants.py --diff test base rag      # 바뀐 판단 목록
 ```
 결과: `eval/results/summary_variants/` (git 제외). dev 세트는 2차-5 결과(`eval/results/mm_iu/raw/gemma4_12b`)가 있어야 만들어짐
+
+## 후속 (2026-09-25): 실행 간 흔들림
+
+이 리포트를 쓴 뒤, temperature 0 이어도 Ollama 결과가 호출마다 조금 달라진다는 것을 확인했습니다. 같은 설정(용어집 v0)을 test 세트에서 두 번 돌리면 600칸 중 2칸이 바뀌어 오답이 21 vs 19 로 달라집니다. 따라서 위 표에서 **2건 이내의 차이(예: 용어집 21 vs 둘 다 20)는 흔들림 범위**이고, 결론을 바꿀 만한 차이는 예시(few-shot)의 악화(26)와 형식 실패 감소(3 ➔ 0) 정도입니다. 용어집 v1·v2 실험과 흔들림 측정은 [평가 가이드](evaluation-guide.md#사례-프롬프트-버전으로-고치려다-흔들림을-발견-2026-09-25)에 있습니다.
