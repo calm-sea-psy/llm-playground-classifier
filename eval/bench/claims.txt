@@ -1,0 +1,10 @@
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0006715.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0007016.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0007816.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0008415.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0023115.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0024615.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0026616.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0028916.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0036216.png
+data/samples/aihub/insurance_claim/images/IMG_OCR_6_F_0051816.png

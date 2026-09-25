@@ -1,0 +1,21 @@
+# CNN 서비스 의존성 (Python 3.11) — OcrService 와 별도 가상 환경 (torch 와 paddle 을 한 환경에 두지 않음)
+# 설치: uv venv --python 3.11 && uv pip install -r requirements.txt
+#
+# torch 는 PyTorch 인덱스의 CUDA 12.8 빌드 (RTX 50 시리즈 = Compute Capability 12.0 지원)
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.11.0
+torchvision==0.26.0
+# 흉부 X-ray 사전학습 모델 (NIH·CheXpert·MIMIC 등으로 학습한 DenseNet, 18개 소견)
+torchxrayvision
+# 2차-1b 프레임워크 비교용 (tools/train_monai.py). 서비스 실행에는 필요 없음
+monai
+
+fastapi==0.141.1
+uvicorn==0.53.0
+python-multipart==0.0.32
+pydantic==2.13.5
+
+numpy
+opencv-python-headless
+pillow
+scikit-learn

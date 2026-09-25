@@ -1,0 +1,25 @@
+# CNN 서비스 설정 (2차 Step 2)
+# 새 엔진 추가 = engines/ 에 어댑터 파일 1개 + 아래에 [engines.<이름>] 섹션 1개 (OCR 서비스와 같은 구조)
+
+[service]
+default_engine = "xrv"
+# 서버 시작 시 미리 로딩할 엔진 (첫 요청 지연 방지)
+preload = ["xrv", "pneumonia"]
+
+# 18개 소견 (성인 흉부 X-ray). 출력이 모델 운영 기준점 = 0.5 로 변환되어 있어 기본 기준 0.5
+# 소아(Kaggle) 데이터에 맞춰 보정하지 않음: 성인 데이터(IU X-Ray)에서 쓸 엔진이라 소아 분포에 맞추면 오히려 어긋남.
+# 소아 폐렴에서는 "Pneumonia" 가 기준 0.5 에서 폐렴의 21% 만 잡음 ➔ 폐렴 판정은 pneumonia 엔진 사용 (eval/cnn_eval.py)
+[engines.xrv]
+adapter = "engines.xrv_engine:XrvEngine"
+weights = "densenet121-res224-all"
+device = "cuda"
+thresholds = { default = 0.5 }
+
+# 폐렴 이진 분류 (Kaggle 소아 흉부 X-ray 로 미세조정). 확률이 과신이라 0.5 면 특이도 57%.
+# 기준값 0.989 = Kaggle test 의 보정용 절반에서 "민감도 95% 이상"을 지키는 가장 높은 값 (의료 선별: 놓치지 않기 우선)
+# ➔ 보정에 쓰지 않은 나머지 절반(318장)에서 민감도 94.9% · 특이도 95.0% (eval/cnn_eval.py)
+[engines.pneumonia]
+adapter = "engines.pneumonia:PneumoniaEngine"
+checkpoint = "data/models/pneumonia_densenet121.pt"
+device = "cuda"
+thresholds = { Pneumonia = 0.989 }

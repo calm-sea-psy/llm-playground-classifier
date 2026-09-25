@@ -1,0 +1,72 @@
+{
+  "// 설명": "감시 대상. 경로(command, cwd)는 저장소 루트 기준. 시작 순서는 dependsOn 으로 결정. requiredBy 가 비어 있으면 항상 감시, 있으면 EnabledSteps 와 겹칠 때만",
+  "Monitor": {
+    "EnabledSteps": [ "text", "image" ],
+    "Targets": [
+      {
+        "Name": "postgres",
+        "Check": "tcp://127.0.0.1:5432",
+        "Command": "docker",
+        "Args": [ "compose", "up", "-d", "postgres" ],
+        "Cwd": ".",
+        "OneShot": true,
+        "StartupSeconds": 30,
+        "Restart": true
+      },
+      {
+        "Name": "ocr",
+        "Check": "http://127.0.0.1:8001/health",
+        "Command": "src/OcrService/.venv/Scripts/uvicorn.exe",
+        "Args": [ "main:app", "--host", "127.0.0.1", "--port", "8001" ],
+        "Cwd": "src/OcrService",
+        "Env": { "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK": "True", "PYTHONIOENCODING": "utf-8" },
+        "StartupSeconds": 60,
+        "Restart": true,
+        "RequiredBy": [ "text" ]
+      },
+      {
+        "Name": "cnn",
+        "Check": "http://127.0.0.1:8002/health",
+        "Command": "src/CnnService/.venv/Scripts/uvicorn.exe",
+        "Args": [ "main:app", "--host", "127.0.0.1", "--port", "8002" ],
+        "Cwd": "src/CnnService",
+        "Env": { "PYTHONIOENCODING": "utf-8" },
+        "StartupSeconds": 60,
+        "Restart": true,
+        "RequiredBy": [ "image" ]
+      },
+      {
+        "Name": "ollama",
+        "Check": "http://127.0.0.1:11434/api/tags",
+        "DegradedUnlessContains": "gemma4:12b",
+        "Command": "ollama",
+        "Args": [ "serve" ],
+        "Cwd": ".",
+        "StartupSeconds": 30,
+        "// Restart": "Windows 설치판은 트레이 앱이 관리하므로 기본은 감시만",
+        "Restart": false
+      },
+      {
+        "Name": "api",
+        "Check": "http://127.0.0.1:5000/health/live",
+        "Command": "dotnet",
+        "Args": [ "run", "--no-build", "--launch-profile", "http" ],
+        "Cwd": "src/Api",
+        "Env": { "DOTNET_CLI_TELEMETRY_OPTOUT": "1" },
+        "StartupSeconds": 60,
+        "Restart": true,
+        "DependsOn": [ "postgres", "ocr", "cnn", "ollama" ]
+      },
+      {
+        "Name": "web",
+        "Check": "http://127.0.0.1:5173/",
+        "Command": "cmd",
+        "Args": [ "/c", "npm", "run", "dev" ],
+        "Cwd": "src/Web",
+        "StartupSeconds": 30,
+        "Restart": true,
+        "DependsOn": [ "api" ]
+      }
+    ]
+  }
+}

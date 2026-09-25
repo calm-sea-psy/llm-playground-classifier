@@ -1,0 +1,21 @@
+# OCR 서비스 의존성 (Python 3.11)
+# 설치: uv venv --python 3.11 && uv pip install -r requirements.txt
+#
+# paddlepaddle-gpu 는 PyPI 가 아닌 Paddle 인덱스에서 받음 (CUDA 12.9 빌드, RTX 50 시리즈 = Compute Capability 12.0 지원)
+--extra-index-url https://www.paddlepaddle.org.cn/packages/stable/cu129/
+paddlepaddle-gpu==3.4.0
+paddleocr==3.7.0
+# [ocr] 추가 의존성: PP-StructureV3(문서 파싱, engines/structure.py)에 필요
+paddlex[ocr]==3.7.2
+# paddlex 가 런타임에 pkg_resources 를 사용
+setuptools
+
+fastapi==0.141.1
+uvicorn==0.53.0
+python-multipart==0.0.32
+pydantic==2.13.5
+
+numpy==2.3.5
+opencv-contrib-python==4.10.0.84
+pillow==12.3.0
+openpyxl==3.1.5

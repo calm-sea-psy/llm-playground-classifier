@@ -1,0 +1,143 @@
+# llm-playground-classifier — 로컬 LLM 도입 평가 도구
+
+[![CI](https://github.com/calm-sea-psy/llm-playground-classifier/actions/workflows/ci.yml/badge.svg)](https://github.com/calm-sea-psy/llm-playground-classifier/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+사내 문서 업무에 **로컬(온프레미스) LLM을 도입하기 전에**, 실제 업무 문서를 파이프라인에 넣어 보고 도입 판단에 필요한 답을 숫자로 얻는 도구입니다.
+- 어떤 모델과 설정이 가장 정확하고 빠른가
+- 결과의 몇 %를 사람이 확인해야 하는가
+- 틀리는 이유가 "몰라서"(RAG로 해결)인가, "규칙을 못 따라서"(파인튜닝 검토)인가
+
+OCR, LLM, CNN이 GPU 한 장(RTX 5080 16GB)에서 외부 API 없이 돌아가므로, 개인정보가 담긴 문서도 밖으로 보내지 않고 평가할 수 있습니다.
+
+![문서 실험 상세: 같은 문서 43장을 설정 조합 2개로 처리해 비교](docs/images/text-experiment.png)
+
+## 무엇을 할 수 있나
+
+| 도입 전 질문 | 기능 | 나오는 것 |
+|---|---|---|
+| 우리 문서에 어떤 모델·설정이 맞나? | **모델 비교 실험**: 문서 최대 50장 × 설정 조합 최대 4개 | 조합별 필드 정확도, 검증 통과율, 폴백 비율, 처리 시간, 점수와 추천 |
+| LLM 결과를 얼마나 믿을 수 있나? | **C# 규칙 검증**(합계, 수량×단가, 날짜, 사업자번호) + **VLM 폴백** | 검증 통과율, 사람 확인 비율, 문제가 있는 칸 강조 |
+| 프롬프트를 고치면 나아지나? | **프롬프트 관리**: 버전 저장·적용·비교, 작업마다 사용한 버전 기록 | 버전별 결과, 실험 도중 프롬프트가 바뀌면 경고 |
+| RAG로 충분한가, 파인튜닝이 필요한가? | **평가 스크립트** + 오답 유형 분류 | 유형별 오답 수, RAG·예시 적용 전후 비교 |
+
+같은 방법론을 **흉부 X-ray 판독**(CNN + VLM 교차 검증)과 **X-ray + 소견서 통합**으로 확장해, 영상 AI와 LLM을 함께 쓰는 경우도 평가했습니다 (연구·평가용, 진단 불가).
+
+## 핵심 결과
+
+공개 데이터로 이 도구를 직접 써서 내린 결정입니다.
+
+**문서 추출: 모델 선정** — KORIE 영수증 150장, 품질 개선(수량 보정 규칙, 합계 필드 분리, 모델별 프롬프트) 후 재측정. 첫 측정은 [모델 선정 리포트](docs/model_selection.md)
+
+| 지표 | gemma4:12b | qwen3-vl:8b |
+|---|---|---|
+| 합계 일치 (결제 금액·할인 전 합계 중 하나) | 96.5% | 95.1% |
+| 필드 일치 | 63.1% | 64.3% |
+| **검증 통과** (사람 확인 없이 끝난 비율) | **92.7%** | 63.3% |
+| **지어낸 금액** (인쇄되지 않은 수량×단가 값) | **1건** | 5건 |
+| 작업 시간 중앙값 | 14.9초 | 9.7초 |
+
+정확도는 1~2%p 차이로 비슷했습니다. **사람이 확인해야 하는 문서가 7%와 37%로 크게 달라** gemma4:12b를 골랐습니다. 지표 하나로 고르지 않고 "틀린 값을 얼마나 만들고, 얼마나 사람에게 넘기는가"를 기준으로 삼았습니다.
+
+**RAG vs 파인튜닝** — IU X-Ray 소견서 요약, 상세는 [결론 리포트](docs/rag_vs_finetuning.md)
+
+| 방식 (보류 세트 120건) | 오답 | 형식 실패 |
+|---|---|---|
+| 기본 프롬프트 | 24 | 3 |
+| **+ 용어집 RAG** (소견서에 나온 용어의 정의만 검색해 첨부) | **21** | **0** |
+| + 예시 4개 (few-shot) | 26 (악화) | 1 |
+
+- 예시는 개발 세트에서는 19건을 14건으로 줄였지만, 보류 세트에서는 오히려 늘었습니다. 개발 세트만 봤다면 반대 결론을 냈을 것입니다.
+- 남은 오답 21건을 원문으로 하나씩 분류했습니다.
+  - 18건은 모델이 규칙대로 판단했는데 정답 라벨의 기준이 다른 경우였습니다 (의심 표현, 라벨 누락).
+  - 모델이 실제로 규칙을 어긴 것은 3건(2.5%)이었습니다.
+- 결론: **LLM은 파인튜닝하지 않고**, RAG + 코드 검증 + 사람 확인으로 갑니다. 파인튜닝은 "못 봐서" 틀리는 영상 모델 쪽에만 적용했습니다(소아 폐렴 CNN).
+
+**확장 사례: X-ray + 소견서 통합** — IU X-Ray 성인 120건 (정상 40, 이상 80)
+- 이상 영상 검출률이 CNN 단독 80%에서 CNN + VLM 통합 89~90%로 올랐습니다.
+- CNN 폐렴 오답 30건 중 VLM과의 불일치로 걸러진 것은 7~9건이었고, 소견서와의 불일치로는 25건이 걸러졌습니다. 같은 영상을 보는 두 모델은 같이 틀리는 경우가 많아, **독립된 정보원**이 검사관으로 더 유효했습니다.
+
+## 설계 결정
+
+| 결정 | 이유 |
+|---|---|
+| LLM은 OCR 텍스트를 **구조화만** 하고, 이미지를 직접 읽는 VLM은 **폴백**으로만 | VLM이 이미지에서 바로 JSON을 뽑으면 금액·번호를 그럴듯하게 지어낼 위험이 커서 주 경로에서 뺌. 실제로 qwen3-vl은 수량×단가로 금액을 계산해 넣었음 |
+| LLM 출력은 **C# 규칙으로 검증**, 실패하면 폴백하고 그래도 안 되면 사람 확인 | 첫 스파이크에서 gemma4가 합계를 5,270조 원으로 뽑음. 또 모델에게 규칙 위반을 알려 주면 값을 규칙에 "맞춰서" 계산해 버려서, 폴백 때는 "원본에서 확인하라"고만 전달 |
+| 추천 조합은 **자동 적용하지 않음** | 점수는 샘플에 따라 흔들림. 사람이 근거를 보고 [기본으로 적용] |
+| 작업마다 **설정 스냅숏 · 프롬프트 버전(내용 해시) · 기기 사양** 기록 | 결과를 재현·비교하려면 처리 조건이 남아야 함. 실험 도중 프롬프트가 바뀌면 경고 |
+| 프롬프트는 **파일이 기본값, UI 수정은 DB 버전** | 이력과 되돌리기. 저장 전에 템플릿 변수 집합을 기본값과 비교해 파이프라인을 깨뜨리는 수정을 막음 |
+| X-ray는 VLM에 CNN 결과를 **보여 주지 않고** 독립 판독 | 보여 주면 VLM이 CNN을 따라가 교차 검증의 의미가 없어짐 (성인 29장 실험에서 CNN 오답 적발 4건 중 3건 vs 2건, 예비 결과) |
+| OCR과 LLM이 **GPU 한 장 공유** | 큰 이미지 OCR 전에 LLM을 내리는 옵션. OCR 지연의 원인을 이분 탐색으로 찾아 8.5MP 초과 이미지는 축소해 인식 (해당 사진 22초 → 1초) |
+| 기능을 **모듈 단위로 켜고 끔** (`Features`) | 문서 평가만 필요하면 CNN 서비스 없이 실행. torch와 paddle은 별도 가상 환경 |
+
+## 화면
+
+| X-ray 모델 비교 (조합 4개) | X-ray 판독 (Grad-CAM · 18소견 · 교차 검증) |
+|---|---|
+| ![X-ray 실험 상세](docs/images/xray-experiment.png) | ![X-ray 판독 결과](docs/images/xray-job.png) |
+
+| 프롬프트 관리 (파일 기본값과 비교) |
+|---|
+| ![프롬프트 편집](docs/images/prompt-diff.png) |
+
+X-ray 영상: Kermany et al., [Chest X-Ray Images (Pneumonia)](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia), CC BY 4.0
+
+## 기술 스택
+
+| 영역 | 사용 |
+|---|---|
+| API | .NET 10 Minimal API, Semantic Kernel (Ollama 네이티브 API 커넥터 직접 구현), EF Core + PostgreSQL 17, SignalR, Channel 작업 큐 |
+| OCR | Python FastAPI, PaddleOCR PP-OCRv5 / PP-StructureV3 |
+| 영상 | Python FastAPI, PyTorch, TorchXRayVision (18소견), 미세조정 DenseNet121 (소아 폐렴), Grad-CAM |
+| LLM | Ollama: gemma4:12b (기본), qwen3-vl:8b, qwen3-vl:8b-instruct |
+| 웹 | React 19, Vite, TypeScript |
+| 운영 | 모니터링 서버(.NET): 헬스 체크, 자동 재시작, Discord/Slack 알림 |
+| 품질 | xUnit 단위 테스트 (규칙 검증, 프롬프트 검사, 작업 기록), GitHub Actions |
+
+```mermaid
+flowchart LR
+    Web["웹 :5173"] --> Api["API :5000<br/>작업 큐 · 워커 · 규칙 검증"]
+    Api --> Ocr["OCR :8001"]
+    Api --> Cnn["CNN :8002"]
+    Api --> Ollama["Ollama :11434"]
+    Api --> Db[("PostgreSQL")]
+    Monitor["모니터링 :5100"] -. "감시 · 재시작" .-> Api
+```
+
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| [구조](docs/architecture.md) | 전체 구조도, 문서·X-ray 처리 흐름, 설계 원칙, 서비스 구성 |
+| [설치와 실행](docs/installation.md) | 요구 사항, 서비스별 설치, 폐렴 모델 학습, 정답 데이터, 실행 방법 |
+| [화면 사용법](docs/user-guide.md) | 모델 비교, 실험 상세, 문서 처리, X-ray 판독, 통합, 프롬프트, 서비스 상태 |
+| [평가 가이드](docs/evaluation-guide.md) | 평가 절차, 오답 분류, 평가 스크립트(`eval/`) |
+| [모델 선정 리포트](docs/model_selection.md) | KORIE 150장 gemma4 vs qwen3-vl |
+| [RAG vs 파인튜닝 결론](docs/rag_vs_finetuning.md) | 오답 유형 분류와 용어집·예시 실험 |
+
+### 빠른 시작
+
+요구 사항: Windows 11, NVIDIA GPU(16GB 권장), Docker, .NET 10, Node.js 22+, Python 3.11 + uv, Ollama. 서비스별 설치는 [설치와 실행](docs/installation.md)에 있습니다.
+
+```bash
+cd src/Monitor
+dotnet run
+```
+
+모니터링 서버가 PostgreSQL, OCR, CNN, API, 웹을 순서대로 띄웁니다. 브라우저에서 `http://localhost:5173` 을 엽니다.
+
+## 한계와 도입 전에 더 필요한 것
+
+- **표본 규모**: 평가는 공개 데이터 120~150건 단위입니다. 수치는 비교용이며, 실제 도입 판단은 현장 문서 수백 장으로 다시 측정해야 합니다.
+- **평가용 도구**: 인증과 권한, 검수 화면(수정·승인·반려), ERP/EMR 연동, 대량 처리(vLLM, GPU 추가)는 없습니다.
+- **Windows 기준**: 모니터링 서버의 실행 경로(`.venv/Scripts`, `cmd /c`)가 Windows용입니다.
+- **의료 기능**: 연구·평가용입니다. 진단 보조로 쓰려면 의료기기 소프트웨어 인허가와 임상 검증이 필요합니다.
+
+## 라이선스와 데이터
+
+- 코드: [MIT](LICENSE)
+- 데이터와 모델 가중치는 저장소에 포함하지 않으며, 각 출처의 조건을 따릅니다.
+  - KORIE 영수증
+  - AI Hub OCR 데이터 (금융 및 물류): 재배포 불가
+  - Kaggle Chest X-Ray Images (Pneumonia): CC BY 4.0
+  - Chest X-rays (Indiana University)
+  - TorchXRayVision 사전학습 가중치

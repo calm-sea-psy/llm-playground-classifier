@@ -1,0 +1,50 @@
+# 빌드 + 단위 테스트. GPU·Ollama·데이터가 필요한 평가(eval/)는 로컬에서만 돌린다
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  dotnet:
+    name: .NET 빌드 · 테스트
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: 빌드 (API · 모니터링 · 테스트)
+        run: dotnet build llm-playground-classifier.slnx
+      - name: 단위 테스트 (규칙 검증 · 프롬프트 검사 · 작업 기록 · 용어집)
+        run: dotnet test tests/Api.Tests --no-build --logger "console;verbosity=normal"
+
+  web:
+    name: 웹 린트 · 빌드
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/Web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - name: 타입 검사 + 빌드
+        run: npm run build
+
+  python:
+    name: Python 문법 검사
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # 서비스는 GPU 빌드(paddle·torch)가 필요해 설치하지 않고, 모든 파일이 컴파일되는지만 확인
+      - run: python -m compileall -q src/OcrService src/CnnService eval

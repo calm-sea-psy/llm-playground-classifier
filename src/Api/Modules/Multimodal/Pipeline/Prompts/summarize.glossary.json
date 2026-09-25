@@ -1,0 +1,45 @@
+{
+  "description": "소견서 요약용 용어집 (2차-6). 소견서에 pattern(정규식, 대소문자 무시)이 있으면 text 를 요약 system 프롬프트에 붙인다. 근거: docs/rag_vs_finetuning.md",
+  "entries": [
+    {
+      "pattern": "edema",
+      "text": "pulmonary edema(폐부종): 폐 간질·폐포에 체액이 고인 상태. 'interstitial edema', 'mild edema' 는 true. 'no edema', 'no overt edema', 'without edema' 처럼 부정되면 false."
+    },
+    {
+      "pattern": "congest|vascular (prominence|engorgement|redistribution)|cephalization",
+      "text": "pulmonary vascular congestion(폐혈관 울혈) 은 폐부종이 아니다. 혈관이 굵어진 것일 뿐 체액이 폐 조직에 고인 것이 아니므로, edema 가 따로 적혀 있지 않으면 edema=false."
+    },
+    {
+      "pattern": "interstitial (prominence|marking|opacit|pattern)|reticular",
+      "text": "interstitial prominence/markings(간질 음영 증가) 자체는 폐부종도 폐렴도 아니다. 'could represent edema' 처럼 부종 가능성을 적었을 때만 edema=true (의심 = true 규칙)."
+    },
+    {
+      "pattern": "infiltrat",
+      "text": "infiltrate(침윤) 는 폐렴을 시사하는 표현으로 pneumonia=true 로 본다. 폐부종(edema)과는 다른 소견이다."
+    },
+    {
+      "pattern": "airspace|consolidat",
+      "text": "airspace disease/opacity, consolidation(공기공간 음영·경화) 은 pneumonia=true 로 본다. 단 'no focal airspace disease', 'no consolidation' 처럼 부정되면 false."
+    },
+    {
+      "pattern": "atelecta|subsegmental|discoid|plate-?like",
+      "text": "atelectasis(무기폐): 'subsegmental/discoid/platelike atelectasis' 도 무기폐다. 'scarring or atelectasis' 처럼 가능성으로 적어도 true."
+    },
+    {
+      "pattern": "scar|granuloma|fibros",
+      "text": "scarring(흉터)·granuloma(육아종)·fibrosis(섬유화) 는 무기폐·폐렴이 아니다. 이것만 있으면 atelectasis·pneumonia=false."
+    },
+    {
+      "pattern": "effusion|costophrenic|blunt",
+      "text": "pleural effusion(흉수): 'blunting of the costophrenic angle' 을 흉수로 해석했으면 true. 'no effusion', 'effusion has resolved' 는 false."
+    },
+    {
+      "pattern": "cardiomegaly|heart size|cardiac silhouette|enlarged",
+      "text": "cardiomegaly(심장비대): 'enlarged heart', 'borderline/mild cardiomegaly' 는 true. 'heart size is normal/upper limits of normal' 은 false."
+    },
+    {
+      "pattern": "pneumothora",
+      "text": "pneumothorax(기흉) 는 5개 대상 소견 어디에도 해당하지 않는다. 기흉으로 인한 폐 허탈(collapse) 은 atelectasis 로 본다."
+    }
+  ]
+}

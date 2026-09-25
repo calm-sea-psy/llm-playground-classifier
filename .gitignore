@@ -1,0 +1,33 @@
+# 환경/비밀
+.env
+appsettings.Development.json
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# Node
+node_modules/
+dist/
+
+doc/todo.md
+doc/develop.md
+doc/retrospective.md
+
+# 데이터 (AI Hub 데이터·업로드 결과는 커밋하지 않음)
+data/uploads/
+data/samples/
+data/verify/
+data/monitor/
+data/models/
+
+# 평가 결과 (KORIE 라벨 파생 데이터 포함 ➔ 요약은 docs/model_selection.md 로)
+eval/results/
+eval/**/*.log

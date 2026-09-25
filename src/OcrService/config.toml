@@ -1,0 +1,28 @@
+# OCR 서비스 설정
+# 새 엔진 추가 = engines/ 에 어댑터 파일 1개 + 아래에 [engines.<이름>] 섹션 1개
+
+[service]
+default_engine = "paddleocr"
+# 서버 시작 시 미리 로딩할 엔진 (첫 요청 지연 방지)
+preload = ["paddleocr"]
+
+[engines.paddleocr]
+adapter = "engines.paddle:PaddleEngine"
+lang = "korean"                      # ➔ PP-OCRv5_server_det + korean_PP-OCRv5_mobile_rec
+device = "gpu:0"
+use_textline_orientation = true      # 기울어진·뒤집힌 줄 보정
+# 문서 방향 보정·왜곡 펴기는 이미지 자체를 바꿔 bbox 좌표계가 원본과 달라지므로 끔
+use_doc_orientation_classify = false
+use_doc_unwarping = false
+# 이보다 큰 이미지는 축소해서 인식 (약 9MP 초과 시 추론 시간 1초 ➔ 20초+, 2026-09-24 측정)
+max_pixels = 8_500_000
+
+# 경로 B: 문서 파싱 (레이아웃 + 표 HTML + 읽기 순서 Markdown). 모델 로딩 약 10초·VRAM 수 GB 라 요청 시 로딩
+[engines.ppstructure]
+adapter = "engines.structure:PaddleStructureEngine"
+lang = "korean"
+device = "gpu:0"
+use_textline_orientation = true
+use_table_recognition = true
+use_region_detection = true
+max_pixels = 8_500_000
