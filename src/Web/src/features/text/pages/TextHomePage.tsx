@@ -83,7 +83,7 @@ export function TextHomePage() {
                 <th>상태</th>
                 <th className="hide-sm">모델</th>
                 <th className="hide-sm">메시지</th>
-                <th>시각</th>
+                <th title="끝난 작업은 완료 시각, 진행 중이면 접수 시각">완료 시각</th>
               </tr>
             </thead>
             <tbody>
@@ -99,7 +99,9 @@ export function TextHomePage() {
                   <td className="small ellipsis hide-sm" title={j.message ?? undefined}>
                     {j.message}
                   </td>
-                  <td className="muted small tabular">{new Date(j.createdAt).toLocaleString('ko-KR')}</td>
+                  <td className="muted small tabular">
+                      {j.completedAt ? new Date(j.completedAt).toLocaleString('ko-KR') : `접수 ${new Date(j.createdAt).toLocaleString('ko-KR')}`}
+                    </td>
                 </tr>
               ))}
             </tbody>

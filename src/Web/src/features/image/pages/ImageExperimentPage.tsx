@@ -158,8 +158,12 @@ function Detail({ id }: { id: string }) {
                     <td className={`num tabular small ${c.vlmSuccessRate != null && c.vlmSuccessRate < 0.9 ? 'text-bad' : ''}`}>
                       {pct(c.vlmSuccessRate)}
                     </td>
-                    <td className="num tabular small">
+                    <td
+                      className={`num tabular small ${c.vlmJudged != null && c.vlmJudged < 10 ? 'muted' : ''}`}
+                      title={`판독에 성공하고 정답이 있는 영상 ${c.vlmJudged ?? '?'}장 기준`}
+                    >
                       {pct(c.vlmSensitivity)} / {pct(c.vlmSpecificity)}
+                      {c.vlmJudged != null && c.vlmJudged < c.labeledDocs && <span className="small"> (n={c.vlmJudged})</span>}
                     </td>
                     <td className="num tabular small">{pct(c.agreementRate)}</td>
                     <td className="num tabular small" title={`CNN 오답 ${c.cnnErrors}건`}>

@@ -13,7 +13,10 @@ preload = ["xrv", "pneumonia"]
 adapter = "engines.xrv_engine:XrvEngine"
 weights = "densenet121-res224-all"
 device = "cuda"
-thresholds = { default = 0.5 }
+# 소견별 기준 (2026-09-25, eval/cnn_calibrate.py): IU 성인 1,500장으로 다시 잡음. 0.5 일괄이면 양성의 절반 이상이 0.50~0.52 에 몰려
+# 정상 영상에도 섬유화·결절 등이 붙었음. 양성 30건 이상 = Youden 최대, 적으면 정상 영상 98% 가 음성인 값 (0.5 아래로는 안 내림)
+# ➔ 보정에 안 쓴 120건: 양성 소견이 붙은 정상 영상 20/40 ➔ 11/40. 무기폐·심장비대·경화·흉수·폐부종은 0.5 가 이미 최적이라 그대로
+thresholds = { default = 0.5, "Fibrosis" = 0.516, "Infiltration" = 0.532, "Mass" = 0.525, "Nodule" = 0.515, "Pleural_Thickening" = 0.506, "Pneumothorax" = 0.504 }
 
 # 폐렴 이진 분류 (Kaggle 소아 흉부 X-ray 로 미세조정). 확률이 과신이라 0.5 면 특이도 57%.
 # 기준값 0.989 = Kaggle test 의 보정용 절반에서 "민감도 95% 이상"을 지키는 가장 높은 값 (의료 선별: 놓치지 않기 우선)

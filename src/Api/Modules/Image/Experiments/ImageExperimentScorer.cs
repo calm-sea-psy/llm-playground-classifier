@@ -33,7 +33,9 @@ public sealed record ImageComboResultDto(
     double? MedianCnnMs,
     double? MedianLlmSec,
     double? Score,
-    int? Rank);
+    int? Rank,
+    /// <summary>VLM 민감도·특이도를 계산한 영상 수 (판독 성공 + 폐렴 정답 있음). 판독이 많이 실패하면 작아짐</summary>
+    int VlmJudged = 0);
 
 public sealed record ImageDocCellDto(
     Guid JobId,
@@ -192,7 +194,7 @@ public sealed class ImageExperimentScorer(AppDbContext db, ImageLabels labels)
                 normalTotal > 0 ? (double)normalOk / normalTotal : null,
                 agreeTotal > 0 ? (double)agreeCount / agreeTotal : null,
                 cnnErrors, cnnErrors > 0 ? (double)flagged / cnnErrors : null,
-                median, Median(cnnMs), Median(llmSec), score, null));
+                median, Median(cnnMs), Median(llmSec), score, null, vlm.Count));
         }
 
         // 순위: 모든 문서가 끝난 조합만
@@ -252,6 +254,8 @@ public sealed class ImageExperimentScorer(AppDbContext db, ImageLabels labels)
             if (actual) { if (predicted) tp++; else fn++; }
             else { if (predicted) fp++; else tn++; }
         }
+
+        public int Count => tp + fn + tn + fp;
 
         public double? Sensitivity => tp + fn > 0 ? (double)tp / (tp + fn) : null;
         public double? Specificity => tn + fp > 0 ? (double)tn / (tn + fp) : null;

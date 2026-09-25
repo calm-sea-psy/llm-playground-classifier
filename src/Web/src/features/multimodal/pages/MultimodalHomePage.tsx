@@ -4,7 +4,7 @@ import { listJobs } from '../../../shared/api/jobs'
 import { isFinished, type JobDto } from '../../../shared/api/types'
 import { StatusBadge } from '../../../shared/components/StatusBadge'
 import { UploadDropzone } from '../../../shared/components/UploadDropzone'
-import type { Population } from '../../image/api'
+import { getImageSettings, type Population } from '../../image/api'
 import { Disclaimer } from '../../image/components/Disclaimer'
 import { POPULATION_NAMES } from '../../image/labels'
 import { createMultimodalJob } from '../api'
@@ -23,6 +23,13 @@ export function MultimodalHomePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<JobDto[]>([])
+  const [model, setModel] = useState<string | null>(null)
+
+  useEffect(() => {
+    getImageSettings()
+      .then((s) => setModel(s.settings.model))
+      .catch(() => {})
+  }, [])
 
   const hasRunning = jobs.some((j) => !isFinished(j.status))
   useEffect(() => {
@@ -65,7 +72,13 @@ export function MultimodalHomePage() {
         <div className="multimodal-inputs">
           <div>
             <h4>흉부 X-ray</h4>
-            <UploadDropzone accept={ACCEPT} file={xray} onFile={setXray} disabled={submitting} />
+            <UploadDropzone
+              accept={ACCEPT}
+              file={xray}
+              onFile={setXray}
+              disabled={submitting}
+              label="흉부 X-ray 를 끌어다 놓거나 클릭해서 선택"
+            />
           </div>
           <div>
             <h4>소견서</h4>
@@ -87,7 +100,13 @@ export function MultimodalHomePage() {
                 maxLength={20000}
               />
             ) : (
-              <UploadDropzone accept={ACCEPT} file={reportFile} onFile={setReportFile} disabled={submitting} />
+              <UploadDropzone
+                accept={ACCEPT}
+                file={reportFile}
+                onFile={setReportFile}
+                disabled={submitting}
+                label="소견서 이미지를 끌어다 놓거나 클릭해서 선택"
+              />
             )}
           </div>
         </div>
@@ -105,6 +124,11 @@ export function MultimodalHomePage() {
         <div className="upload-actions">
           <span className="muted small">
             영상 분석 설정은 <Link to="/image">X-ray 판독 기본 설정</Link>을 따릅니다
+            {model && (
+              <>
+                {' '}· LLM <strong>{model}</strong> (VLM 판독 · 소견서 요약 · 종합 보고서 공통)
+              </>
+            )}
           </span>
           <button type="submit" className="primary" disabled={!xray || !reportReady || submitting}>
             {submitting ? '업로드 중…' : '종합 보고서 만들기'}
@@ -125,7 +149,7 @@ export function MultimodalHomePage() {
                   <th>X-ray</th>
                   <th>상태</th>
                   <th className="hide-sm">메시지</th>
-                  <th>시각</th>
+                  <th title="끝난 작업은 완료 시각, 진행 중이면 접수 시각">완료 시각</th>
                 </tr>
               </thead>
               <tbody>
@@ -140,7 +164,9 @@ export function MultimodalHomePage() {
                     <td className="small ellipsis hide-sm" title={j.message ?? undefined}>
                       {j.message}
                     </td>
-                    <td className="muted small tabular">{new Date(j.createdAt).toLocaleString('ko-KR')}</td>
+                    <td className="muted small tabular">
+                      {j.completedAt ? new Date(j.completedAt).toLocaleString('ko-KR') : `접수 ${new Date(j.createdAt).toLocaleString('ko-KR')}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

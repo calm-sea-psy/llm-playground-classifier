@@ -5,10 +5,12 @@ interface Props {
   file: File | null
   onFile: (file: File) => void
   disabled?: boolean
+  /** 안내 문구 (기본: 문서 이미지) */
+  label?: string
 }
 
 /** 클릭 또는 드래그 앤 드롭으로 파일 1개 선택 */
-export function UploadDropzone({ accept, file, onFile, disabled }: Props) {
+export function UploadDropzone({ accept, file, onFile, disabled, label = '문서 이미지를 끌어다 놓거나 클릭해서 선택' }: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -51,7 +53,7 @@ export function UploadDropzone({ accept, file, onFile, disabled }: Props) {
         </>
       ) : (
         <>
-          <strong>문서 이미지를 끌어다 놓거나 클릭해서 선택</strong>
+          <strong>{label}</strong>
           <span className="muted">PNG, JPG, BMP, TIFF, WEBP · 20MB 이하</span>
         </>
       )}

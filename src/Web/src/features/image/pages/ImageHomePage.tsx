@@ -64,7 +64,13 @@ export function ImageHomePage() {
             CNN 폐렴 신호 + 18개 소견(Grad-CAM) ➔ VLM 판독 초안(CNN 결과를 보지 않고 독립 판독) ➔ 두 판단 교차 검증
           </p>
         </div>
-        <UploadDropzone accept={ACCEPT} file={file} onFile={setFile} disabled={submitting} />
+        <UploadDropzone
+          accept={ACCEPT}
+          file={file}
+          onFile={setFile}
+          disabled={submitting}
+          label="흉부 X-ray 를 끌어다 놓거나 클릭해서 선택"
+        />
         <fieldset className="population" disabled={submitting}>
           <legend className="small">대상</legend>
           {(['adult', 'pediatric'] as const).map((p) => (
@@ -103,7 +109,7 @@ export function ImageHomePage() {
                   <th>파일</th>
                   <th>상태</th>
                   <th className="hide-sm">메시지</th>
-                  <th>시각</th>
+                  <th title="끝난 작업은 완료 시각, 진행 중이면 접수 시각">완료 시각</th>
                 </tr>
               </thead>
               <tbody>
@@ -118,7 +124,9 @@ export function ImageHomePage() {
                     <td className="small ellipsis hide-sm" title={j.message ?? undefined}>
                       {j.message}
                     </td>
-                    <td className="muted small tabular">{new Date(j.createdAt).toLocaleString('ko-KR')}</td>
+                    <td className="muted small tabular">
+                      {j.completedAt ? new Date(j.completedAt).toLocaleString('ko-KR') : `접수 ${new Date(j.createdAt).toLocaleString('ko-KR')}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>

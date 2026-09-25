@@ -6,10 +6,21 @@ interface Props {
   onFiles: (files: File[]) => void
   disabled?: boolean
   max: number
+  /** 안내 문구 (기본: 문서 실험용) */
+  label?: string
+  hint?: string
 }
 
 /** 여러 파일 선택 (클릭·드래그 앤 드롭). 같은 이름은 한 번만 */
-export function MultiDropzone({ accept, files, onFiles, disabled, max }: Props) {
+export function MultiDropzone({
+  accept,
+  files,
+  onFiles,
+  disabled,
+  max,
+  label = '실험할 문서 이미지를 끌어다 놓거나 클릭해서 선택 (여러 장)',
+  hint = 'KORIE 영수증이면 정답 라벨로 필드 정확도까지 계산',
+}: Props) {
   const input = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -63,8 +74,10 @@ export function MultiDropzone({ accept, files, onFiles, disabled, max }: Props) 
           </>
         ) : (
           <>
-            <strong>실험할 문서 이미지를 끌어다 놓거나 클릭해서 선택 (여러 장)</strong>
-            <span className="muted">KORIE 영수증이면 정답 라벨로 필드 정확도까지 계산 · 최대 {max}장</span>
+            <strong>{label}</strong>
+            <span className="muted">
+              {hint} · 최대 {max}장
+            </span>
           </>
         )}
       </div>

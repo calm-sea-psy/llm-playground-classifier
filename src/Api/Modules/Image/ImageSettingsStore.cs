@@ -28,7 +28,7 @@ public sealed class ImageSettingsStore(AppDbContext db, LlmClient llm, IOptions<
             {
                 Id = PipelineSettingsRecord.ImageId,
                 Settings = new ImageSettings(o.Model ?? llm.DefaultModel, o.VlmReport, o.VlmSeesCnn, o.Population).ToJson(),
-                Note = "초기 설정: VLM 은 CNN 결과를 보지 않고 독립 판독(2차-2), 대상 기본 성인(2차-1b) — doc/develop.md",
+                Note = "초기 설정: VLM 은 CNN 결과를 보지 않고 독립 판독(2차-2), 대상 기본 성인(2차-1b) — docs/architecture.md",
                 UpdatedAt = clock.GetUtcNow(),
             };
             db.Add(record);

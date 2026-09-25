@@ -43,13 +43,25 @@ export function ImageComparePage() {
   const [files, setFiles] = useState<File[]>([])
   const [combos, setCombos] = useState<ImageSettings[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [skipped, setSkipped] = useState<{ id: string; name: string } | null>(null)
 
   const reload = useCallback(async () => {
     const [s, list] = await Promise.all([getImageSettings(), listImageExperiments()])
     setCurrent(s)
     setExperiments(list)
-    const done = list.find((e) => e.status === 'Completed' && e.recommended)
-    setLatest(done ? await getImageExperiment(done.id) : null)
+    // 추천은 "현재 기본 조합이 함께 들어 있는" 가장 최근 실험에서만 (기본이 없는 실험의 1위는 기본보다 나은지 알 수 없음)
+    let found: Awaited<ReturnType<typeof getImageExperiment>> | null = null
+    let skipped: { id: string; name: string } | null = null
+    for (const e of list.filter((x) => x.status === 'Completed' && x.recommended)) {
+      const d = await getImageExperiment(e.id)
+      if (d.combos.some((x) => sameImageSettings(s.settings, x.settings))) {
+        found = d
+        break
+      }
+      skipped ??= { id: e.id, name: e.name }
+    }
+    setLatest(found)
+    setSkipped(skipped)
     return s
   }, [])
 
@@ -97,6 +109,7 @@ export function ImageComparePage() {
   }
 
   const recommended = latest?.recommendedIndex != null ? latest.combos[latest.recommendedIndex] : null
+  const baseline = current ? latest?.combos.find((x) => sameImageSettings(current.settings, x.settings)) : undefined
   const jobs = files.length * combos.length
 
   return (
@@ -114,18 +127,31 @@ export function ImageComparePage() {
           {recommended && latest && (
             <div className="recommend">
               <span className="spec-label">
-                추천 · 최근 실험 <Link to={`/image/experiments/${latest.id}`}>{latest.name}</Link> 1위 (점수{' '}
+                추천 · 현재 기본이 포함된 최근 실험 <Link to={`/image/experiments/${latest.id}`}>{latest.name}</Link> 1위 (점수{' '}
                 {recommended.score?.toFixed(3)})
               </span>
               <strong>{recommended.summary}</strong>
-              {current && sameImageSettings(current.settings, recommended.settings) ? (
-                <span className="chip chip-ok">이미 기본 설정</span>
+              {baseline && baseline.index === recommended.index ? (
+                <span className="chip chip-ok">현재 기본이 1위</span>
               ) : (
-                <button className="primary small-button" onClick={() => apply(latest.id, recommended.index)}>
-                  기본으로 적용
-                </button>
+                <>
+                  {baseline?.score != null && recommended.score != null && (
+                    <span className="muted small">
+                      같은 실험에서 현재 기본 {baseline.score.toFixed(3)} ➔ {recommended.score.toFixed(3)} (+
+                      {(recommended.score - baseline.score).toFixed(3)})
+                    </span>
+                  )}
+                  <button className="primary small-button" onClick={() => apply(latest.id, recommended.index)}>
+                    기본으로 적용
+                  </button>
+                </>
               )}
             </div>
+          )}
+          {skipped && (
+            <span className="muted small recommend-note">
+              더 최근 실험 <Link to={`/image/experiments/${skipped.id}`}>{skipped.name}</Link> 에는 현재 기본 조합이 없어 추천 비교에서 뺐습니다.
+            </span>
           )}
         </div>
       </section>
@@ -152,7 +178,15 @@ export function ImageComparePage() {
             placeholder="문서를 어떻게 골랐는지, 무엇을 확인하려는지 (예: 신뢰도 0.9 미만 문서만 골라 폴백 기준 비교)"
           />
         </label>
-        <MultiDropzone accept={ACCEPT} files={files} onFiles={setFiles} disabled={submitting} max={MAX_FILES} />
+        <MultiDropzone
+          accept={ACCEPT}
+          files={files}
+          onFiles={setFiles}
+          disabled={submitting}
+          max={MAX_FILES}
+          label="실험할 흉부 X-ray 를 끌어다 놓거나 클릭해서 선택 (여러 장)"
+          hint="Kaggle 소아(파일 이름)·IU 성인(소견서)이면 정답으로 민감도·특이도까지 계산"
+        />
         {options && (
           <div className="combos">
             {combos.map((c, i) => (

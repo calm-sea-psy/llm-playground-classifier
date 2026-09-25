@@ -118,6 +118,8 @@ export interface ImageComboResult {
   medianLlmSec: number | null
   score: number | null
   rank: number | null
+  /** VLM 민감도·특이도를 계산한 영상 수 (판독 성공 + 정답 있음) */
+  vlmJudged?: number
 }
 
 export interface ImageDocCell {
