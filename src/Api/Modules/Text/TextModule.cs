@@ -6,6 +6,7 @@ using Api.Modules.Text.Settings;
 using Api.Shared.Data;
 using Api.Shared.Health;
 using Api.Shared.Jobs;
+using Api.Shared.Llm;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -35,6 +36,13 @@ public sealed class TextModule : IPipelineModule
         services.Configure<EvalOptions>(configuration.GetSection("Eval"));
         services.AddScoped<TextPrompts>();
         services.AddScoped<TextPipeline>();
+        services.AddSingleton<PackStore>();
+        services.AddHttpClient(TextPipeline.EngineHttpClient, (sp, http) =>
+        {
+            var llm = sp.GetRequiredService<IOptions<LlmOptions>>().Value;
+            http.BaseAddress = new Uri(llm.BaseUrl);
+            http.Timeout = TimeSpan.FromSeconds(llm.TimeoutSeconds);
+        });
         services.AddScoped<SettingsStore>();
         services.AddScoped<ExperimentScorer>();
         services.AddSingleton<KorieLabels>();

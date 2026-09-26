@@ -7,9 +7,14 @@ using OllamaSharp.Models;
 
 namespace Digitizer.Engine;
 
-public sealed record LlmOptions(string Model, int ContextLength = 16384, string KeepAlive = "10m", bool CpuOnly = false);
+/// <param name="MaxOutputTokens">같은 내용을 끝없이 생성해 시간 초과로 작업 전체가 실패하는 것을 막는 상한 (평가 도구 LlmOptions 와 같은 4096)</param>
+public sealed record LlmOptions(string Model, int ContextLength = 16384, string KeepAlive = "10m", bool CpuOnly = false, int? MaxOutputTokens = null);
 
-public sealed record Extraction(JsonObject? Fields, string Raw, long ElapsedMs, long? InputTokens, long? OutputTokens, int Attempts, string? Error);
+/// <param name="Truncated">최대 출력 토큰에서 잘림 (done_reason=length)</param>
+public sealed record Extraction(JsonObject? Fields, string Raw, long ElapsedMs, long? InputTokens, long? OutputTokens, int Attempts, string? Error, bool Truncated = false);
+
+/// <summary>이미지 입력 (VLM 폴백)</summary>
+public sealed record ImageInput(byte[] Data, string MediaType);
 
 /// <summary>
 /// 원문 ➔ 필드 (LLM 1회, 형식 오류면 1회 재시도). 스키마는 문서 종류 정의에서 만든다.
@@ -25,7 +30,14 @@ public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
         _ => "문서 텍스트",
     };
 
-    public async Task<Extraction> ExtractAsync(DocumentType type, string sourceText, string? sourceKind = null, CancellationToken ct = default)
+    public Task<Extraction> ExtractAsync(DocumentType type, string sourceText, string? sourceKind = null, CancellationToken ct = default) =>
+        ExtractMessagesAsync(type, type.SystemPromptFor(options.Model), type.UserMessage(InputLabel(sourceKind), sourceText), null, ct);
+
+    /// <summary>
+    /// 지시문 · 사용자 메시지를 이미 만든 경우 (평가 도구는 프롬프트 관리 화면의 적용 버전으로 렌더링해서 넘김).
+    /// images 가 있으면 VLM 폴백 (이미지 + 원문)
+    /// </summary>
+    public async Task<Extraction> ExtractMessagesAsync(DocumentType type, string system, string user, IReadOnlyList<ImageInput>? images, CancellationToken ct = default)
     {
         IChatClient client = new OllamaApiClient(ollamaHttp, options.Model);
         var chat = new ChatOptions
@@ -39,28 +51,34 @@ public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
         chat.AdditionalProperties["keep_alive"] = options.KeepAlive;
         chat.AddOllamaOption(OllamaOption.NumCtx, options.ContextLength);
         if (options.CpuOnly) chat.AddOllamaOption(OllamaOption.NumGpu, 0);
+        if (options.MaxOutputTokens is { } max) chat.MaxOutputTokens = max;
+
+        var userMessage = new ChatMessage(ChatRole.User, user);
+        foreach (var image in images ?? []) userMessage.Contents.Add(new DataContent(image.Data, image.MediaType));
 
         var sw = Stopwatch.StartNew();
         string raw = "";
+        var truncated = false;
         long? input = 0, output = 0;
         for (var attempt = 1; attempt <= 2; attempt++)
         {
-            var response = await client.GetResponseAsync(
-            [
-                new(ChatRole.System, type.SystemPromptFor(options.Model)),
-                new(ChatRole.User, type.UserMessage(InputLabel(sourceKind), sourceText)),
-            ], chat, ct);
+            var response = await client.GetResponseAsync([new(ChatRole.System, system), userMessage], chat, ct);
             raw = response.Text;
+            // qwen3-vl 은 think 를 꺼도 답을 thinking 필드에만 넣을 때가 있음 (평가 도구 OllamaChatCompletionService 와 같은 대체)
+            if (string.IsNullOrWhiteSpace(raw))
+                raw = string.Concat(response.Messages.SelectMany(m => m.Contents).OfType<TextReasoningContent>().Select(r => r.Text));
+            truncated = response.FinishReason == ChatFinishReason.Length;
             input += response.Usage?.InputTokenCount ?? 0;
             output += response.Usage?.OutputTokenCount ?? 0;
             try
             {
                 if (JsonNode.Parse(raw) is JsonObject fields)
-                    return new Extraction(fields, raw, sw.ElapsedMilliseconds, input, output, attempt, null);
+                    return new Extraction(fields, raw, sw.ElapsedMilliseconds, input, output, attempt, null, truncated);
             }
             catch (JsonException) { }
         }
-        return new Extraction(null, raw, sw.ElapsedMilliseconds, input, output, 2, "JSON 형식 오류 (재시도 후에도)");
+        return new Extraction(null, raw, sw.ElapsedMilliseconds, input, output, 2,
+            truncated ? "응답이 최대 길이에서 잘림 (같은 내용 반복 생성 의심)" : "JSON 형식 오류 (재시도 후에도)", truncated);
     }
 
     /// <summary>문서 종류 정의 ➔ JSON 스키마. 모든 필드를 required 로 두고 값이 없으면 null (모델이 필드를 빼먹지 않게)</summary>

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Api.Modules.Text.Ocr;
+using Api.Modules.Text.Pipeline;
 using Api.Shared.Data;
 using Api.Shared.Settings;
 using Api.Shared.Llm;
@@ -26,7 +27,9 @@ public sealed record PipelineSettings(
     /// <summary>검증 오류·저신뢰 시 이미지로 다시 추출할지</summary>
     bool VlmFallback,
     /// <summary>금액을 문자열로 받는 스키마 (0단계 자릿수 오추출 대비 실험 옵션)</summary>
-    bool AmountsAsString)
+    bool AmountsAsString,
+    /// <summary>legacy | engine (4차 통합 C: Digitizer.Engine + 문서 종류 팩). 예전 스냅숏에는 없어 legacy</summary>
+    string Extraction = ExtractionModes.Legacy)
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -42,7 +45,8 @@ public sealed record PipelineSettings(
     [JsonIgnore]
     public string Summary =>
         $"{Model} · {(OcrEngine == "ppstructure" ? "경로 B" : "경로 A")} · LLM 내리기 {UnloadBeforeOcr}"
-        + $" · 폴백 {(VlmFallback ? $"<{FallbackConfidence:0.00}" : "끔")}{(AmountsAsString ? " · 금액 문자열" : "")}";
+        + $" · 폴백 {(VlmFallback ? $"<{FallbackConfidence:0.00}" : "끔")}{(AmountsAsString ? " · 금액 문자열" : "")}"
+        + (Extraction == ExtractionModes.Engine ? " · Engine" : "");
 }
 
 public sealed record SettingsDto(PipelineSettings Settings, string Summary, string? Note, DateTimeOffset UpdatedAt);
@@ -112,6 +116,14 @@ public sealed class SettingsStore(
         {
             return "폴백 신뢰도 기준은 0~1 사이여야 합니다";
         }
+        if (!ExtractionModes.All.Contains(s.Extraction))
+        {
+            return $"알 수 없는 추출 방식: {s.Extraction} (사용 가능: {string.Join(", ", ExtractionModes.All)})";
+        }
+        if (s.Extraction == ExtractionModes.Engine && s.AmountsAsString)
+        {
+            return "Engine 추출은 금액 문자열 스키마를 지원하지 않습니다";
+        }
         return null;
     }
 
@@ -121,5 +133,6 @@ public sealed class SettingsStore(
         llmOptions.Value.UnloadBeforeOcr,
         pipelineOptions.Value.FallbackConfidence,
         VlmFallback: true,
-        pipelineOptions.Value.AmountsAsString);
+        pipelineOptions.Value.AmountsAsString,
+        pipelineOptions.Value.Extraction);
 }

@@ -4,7 +4,10 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Api.Shared.Llm;
+using Digitizer.Engine;
 using Microsoft.Extensions.Options;
+using EngineLlmOptions = Digitizer.Engine.LlmOptions;
+using LlmOptions = Api.Shared.Llm.LlmOptions;
 using Microsoft.SemanticKernel;
 
 namespace Api.Modules.Text.Pipeline;
@@ -18,6 +21,10 @@ public sealed class PipelineOptions
     public int VlmMaxImageSide { get; set; } = 1600;
     /// <summary>분류에는 앞부분만 사용 (문서 종류는 머리말로 충분히 구분됨)</summary>
     public int ClassifyMaxChars { get; set; } = 1500;
+    /// <summary>DB 기본 설정이 없을 때의 추출 방식 (ExtractionModes)</summary>
+    public string Extraction { get; set; } = ExtractionModes.Legacy;
+    /// <summary>문서 종류 팩 폴더 (ContentRoot 기준)</summary>
+    public string PacksRoot { get; set; } = "../../packs";
 }
 
 /// <summary>LLM 에 넣을 문서 텍스트. Structured = 문서 파싱 엔진의 Markdown(표는 HTML), 아니면 OCR 줄 읽기 순서 텍스트</summary>
@@ -41,7 +48,10 @@ public sealed record ExtractionAttempt(
     string? ParseError,
     JsonObject? Fields,
     List<ValidationIssue> Issues,
-    string Raw)
+    string Raw,
+    /// <summary>Engine 으로 추출했으면 "팩@버전" (예: receipt@1.0.0), legacy 면 null. 결과만으로는 경로를 구분할 수 없어 기록
+    /// (4차 통합 C: temperature 0 에서 두 경로의 응답이 150장 모두 글자까지 같았음)</summary>
+    string? Engine = null)
 {
     public const string Text = "text";
     public const string Vlm = "vlm";
@@ -64,8 +74,18 @@ public static class PipelineJson
 /// SK 는 LLM 호출(IChatCompletionService, ChatHistory·이미지 입력)과 프롬프트 템플릿 렌더링에 사용하고,
 /// 단계 순서는 고정이므로 함수 자동 호출(planner)은 쓰지 않는다.
 /// </summary>
-public sealed class TextPipeline(LlmClient llm, TextPrompts prompts, IOptions<PipelineOptions> options)
+public sealed class TextPipeline(
+    LlmClient llm,
+    TextPrompts prompts,
+    IOptions<PipelineOptions> options,
+    PackStore packs,
+    IHttpClientFactory httpFactory,
+    IOptions<LlmOptions> llmOptions,
+    ILogger<TextPipeline> logger)
 {
+    /// <summary>Engine 이 Ollama 를 부를 HttpClient 이름 (TextModule 에서 등록)</summary>
+    public const string EngineHttpClient = "digitizer-engine-ollama";
+
     public async Task<Classification> ClassifyDocumentAsync(string model, DocumentText document, LlmImage? image, CancellationToken ct)
     {
         var text = document.Text.Length > options.Value.ClassifyMaxChars
@@ -94,6 +114,7 @@ public sealed class TextPipeline(LlmClient llm, TextPrompts prompts, IOptions<Pi
 
     /// <param name="image">null 이면 OCR 텍스트만으로 추출, 있으면 VLM 폴백 (이미지 + OCR 텍스트)</param>
     /// <param name="previousIssues">폴백 때 텍스트 추출에서 발견된 문제를 힌트로 전달</param>
+    /// <param name="extraction">ExtractionModes. engine 이면 Digitizer.Engine + 팩 (팩이 없거나 금액 문자열 스키마면 legacy)</param>
     public async Task<ExtractionAttempt> ExtractFieldsAsync(
         string model,
         string documentType,
@@ -101,7 +122,8 @@ public sealed class TextPipeline(LlmClient llm, TextPrompts prompts, IOptions<Pi
         LlmImage? image,
         IReadOnlyList<ValidationIssue>? previousIssues,
         bool amountsAsString,
-        CancellationToken ct)
+        CancellationToken ct,
+        string extraction = ExtractionModes.Legacy)
     {
         var system = await prompts.RenderForModelAsync($"extract.{documentType}", model,
             new() { ["amount_rule"] = AmountRule(documentType, amountsAsString) }, ct);
@@ -117,6 +139,17 @@ public sealed class TextPipeline(LlmClient llm, TextPrompts prompts, IOptions<Pi
                   string.Join("\n", previousIssues.Where(i => i.Severity == IssueSeverity.Error).Select(i => $"- {i.Message}"))
                 : "",
         }, ct);
+
+        if (extraction == ExtractionModes.Engine)
+        {
+            if (!amountsAsString && packs.Get(documentType) is { } pack)
+            {
+                return await ExtractWithEngineAsync(pack, model, documentType, document, image, system, user, ct);
+            }
+            // 조용히 legacy 로 가면 측정에서 구분이 안 됨 ➔ 경고 (시도 기록의 Engine 도 null 로 남음)
+            logger.LogWarning("engine 추출을 요청했지만 {DocumentType} 팩이 없거나(폴더 {Root}) 금액 문자열 스키마라 legacy 로 처리",
+                documentType, packs.Root);
+        }
 
         var response = await llm.CompleteJsonAsync(
             new LlmRequest(model, system, user, DocumentSchemas.For(documentType, amountsAsString), image is null ? null : [image]),
@@ -164,6 +197,35 @@ public sealed class TextPipeline(LlmClient llm, TextPrompts prompts, IOptions<Pi
         }
         return new ExtractionAttempt(source, model, response.ElapsedMs, response.PromptTokens, response.CompletionTokens,
             SchemaValid: parseError is null, parseError, fields, issues, response.Content);
+    }
+
+    /// <summary>
+    /// 4차 통합 C: 같은 지시문 · 사용자 메시지(프롬프트 관리 화면의 적용 버전으로 렌더링)를 Engine 으로 추출하고 팩 규칙으로 검증.
+    /// legacy 와 다른 것은 LLM 호출 경로(OllamaSharp)와 검증 코드 경로뿐 ➔ KORIE 150장 재측정으로 비교
+    /// </summary>
+    private async Task<ExtractionAttempt> ExtractWithEngineAsync(
+        DocumentType pack, string model, string documentType, DocumentText document, LlmImage? image,
+        string system, string user, CancellationToken ct)
+    {
+        var o = llmOptions.Value;
+        var extractor = new FieldExtractor(httpFactory.CreateClient(EngineHttpClient),
+            new EngineLlmOptions(model, o.ContextLength, o.KeepAlive, MaxOutputTokens: o.MaxOutputTokens));
+        var result = await extractor.ExtractMessagesAsync(pack, system, user,
+            image is null ? null : [new ImageInput(image.Data, image.MimeType)], ct);
+
+        var fields = result.Fields;
+        var parseError = result.Error;
+        if (fields is not null)
+        {
+            var required = DocumentSchemas.For(documentType, amountsAsString: false)["required"]!.AsArray().Select(n => n!.GetValue<string>());
+            var missing = required.Where(k => !fields.ContainsKey(k)).ToList();
+            if (missing.Count > 0) parseError = $"필드 누락: {string.Join(", ", missing)}";
+        }
+        // 보정 ➔ 영수증 규칙 ➔ 근거 확인(텍스트 추출만) 을 팩 rules 로 (legacy 와 같은 순서, ReceiptPackTests)
+        var issues = fields is null ? [] : Validator.Validate(pack, fields, document.Text, fromImage: image is not null);
+        return new ExtractionAttempt(image is null ? ExtractionAttempt.Text : ExtractionAttempt.Vlm, model, (int)result.ElapsedMs,
+            (int?)result.InputTokens, (int?)result.OutputTokens, SchemaValid: parseError is null, parseError, fields, issues, result.Raw,
+            Engine: $"{pack.Id}@{pack.Version}");
     }
 
     /// <summary>영수증 팩(packs/receipt) 의 amount_rule 변수와 같아야 함 (ReceiptPackTests)</summary>
