@@ -163,6 +163,9 @@ function PackView({ detail }: { detail: PackDetail }) {
       <div className="chips">
         <span className="chip">{summary.autoClassified ? '자동 분류 대상' : '문서 처리에서 직접 선택'}</span>
         <span className="chip">{type.generic_checks === false ? '공통 검사 끔' : '공통 검사 켬'}</span>
+        <span className="chip" title="스캔 · 이미지의 OCR 줄을 묶는 방식. 측정한 방식 그대로 씀">
+          OCR 줄 순서: {READING_ORDER_LABEL[type.reading_order ?? 'top']}
+        </span>
         {managed && <span className="chip chip-warn">지시문: 프롬프트 관리 사용</span>}
       </div>
       {managed && <ManagedNote id={type.id} />}
@@ -527,6 +530,16 @@ function PackEditor({
         <label className="pack-wide">
           <span className="small muted">설명 (문서 처리의 종류 선택에 표시)</span>
           <input value={type.description ?? ''} onChange={(e) => set('description', e.target.value)} />
+        </label>
+        <label>
+          <span className="small muted">OCR 줄 순서 (바꾸면 다시 측정)</span>
+          <select
+            value={type.reading_order ?? 'top'}
+            onChange={(e) => set('reading_order', e.target.value as 'top' | 'center')}
+          >
+            <option value="top">{READING_ORDER_LABEL.top}</option>
+            <option value="center">{READING_ORDER_LABEL.center}</option>
+          </select>
         </label>
         <label className="pack-check pack-wide">
           <input
@@ -918,6 +931,11 @@ function ForbiddenEditor({ items, onChange }: { items: PackForbiddenJson[]; onCh
 }
 
 /* ───────────── 합격 표시 ───────────── */
+
+const READING_ORDER_LABEL = {
+  top: '위쪽 기준 (영수증처럼 줄이 뚜렷한 문서)',
+  center: '세로 중심 기준 (표 칸을 한 행으로)',
+} as const
 
 const REPO_URL = 'https://github.com/calm-sea-psy/llm-playground-classifier/blob/main/'
 const RELEASE_LABEL = { passed: '합격', conditional: '조건부 합격' } as const

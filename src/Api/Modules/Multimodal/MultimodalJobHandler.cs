@@ -3,7 +3,6 @@ using Api.Modules.Image;
 using Api.Modules.Image.Pipeline;
 using Api.Modules.Multimodal.Pipeline;
 using Api.Modules.Text.Ocr;
-using ReadingOrder = Api.Modules.Text.Pipeline.ReadingOrder;
 using Api.Shared.Data;
 using Api.Shared.Jobs;
 using Api.Shared.Storage;
@@ -50,7 +49,7 @@ public sealed class MultimodalJobHandler(
                 result = await ocr.RecognizeAsync(file, settings.ReportFile, engine: null, ct);
             }
             await storage.WriteTextAsync(job.Id, "report_ocr.json", JsonSerializer.Serialize(result, OcrJson.Options), ct);
-            reportText = ReadingOrder.Build(result);
+            reportText = result.ReadingText();
             source = "ocr";
         }
 

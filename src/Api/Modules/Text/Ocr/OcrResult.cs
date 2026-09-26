@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Digitizer.Engine;
 
 namespace Api.Modules.Text.Ocr;
 
@@ -16,7 +17,11 @@ public sealed record OcrResult(
     /// <summary>문서 파싱 엔진(ppstructure)만: 레이아웃 블록 (읽기 순서)</summary>
     IReadOnlyList<LayoutBlock>? Blocks = null,
     /// <summary>문서 파싱 엔진만: 읽기 순서로 복원한 Markdown (표는 HTML). 있으면 LLM 입력으로 우선 사용</summary>
-    string? Markdown = null);
+    string? Markdown = null)
+{
+    /// <summary>LLM 에 넣을 읽기 순서 텍스트 (Engine ReadingOrder, exe 와 같은 규칙). 메서드라 ocr.json 에는 들어가지 않음</summary>
+    public string ReadingText(string mode = ReadingOrder.Top) => ReadingOrder.Build(Lines.Select(l => new OcrBox(l.Text, l.Bbox)), mode);
+}
 
 public sealed record LayoutBlock(string Label, int[] Bbox, string Content);
 

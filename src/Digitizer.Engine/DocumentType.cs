@@ -54,6 +54,9 @@ public sealed partial record DocumentType(
 
     [JsonPropertyName("description")] public string? Description { get; init; }
 
+    /// <summary>OCR 줄 순서 방식 (ReadingOrder.Top · Center). 측정한 방식 그대로 씀 (영수증 top, 이력서 center)</summary>
+    [JsonPropertyName("reading_order")] public string ReadingOrder { get; init; } = Engine.ReadingOrder.Top;
+
     /// <summary>없으면 평가 도구에서만 씀 (exe 에 넣지 않음)</summary>
     [JsonPropertyName("release")] public PackRelease? Release { get; init; }
 

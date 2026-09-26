@@ -143,6 +143,8 @@ export interface PackTypeJson {
   fields: PackFieldJson[]
   forbidden: PackForbiddenJson[]
   rules: string[]
+  /** OCR 줄 순서 방식 (top 기본 · center). 측정한 방식 그대로 씀 */
+  reading_order?: 'top' | 'center'
   release?: PackRelease | null
   changelog?: { version: string; date: string; changes: string }[]
   [extra: string]: unknown

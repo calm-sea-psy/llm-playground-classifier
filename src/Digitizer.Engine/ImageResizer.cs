@@ -1,8 +1,8 @@
 using SkiaSharp;
 
-namespace Api.Shared.Imaging;
+namespace Digitizer.Engine;
 
-/// <summary>VLM 입력용 이미지 준비 (Text 폴백·Image 소견 공용): EXIF 회전 적용 + 긴 변 축소 + JPEG (2480×3508 원본을 그대로 보내면 토큰·시간이 크게 늘어남)</summary>
+/// <summary>VLM 입력용 이미지 준비 (문서 폴백 · 이미지 판독 · exe 공용): EXIF 회전 적용 + 긴 변 축소 + JPEG (2480×3508 원본을 그대로 보내면 토큰·시간이 크게 늘어남)</summary>
 public static class ImageResizer
 {
     public static byte[] ToJpeg(Stream source, int maxSide, int quality = 90)

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Digitizer.Engine;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -31,44 +32,25 @@ public sealed class LlmClient(Kernel kernel, IOptions<LlmOptions> options, IHttp
 
     /// <summary>이 크기(화소 수)의 이미지를 OCR 하기 전에 LLM 을 내려야 하는지</summary>
     public bool ShouldUnloadBeforeOcr(long pixels, UnloadPolicy policy) =>
-        options.Value.Provider == "ollama" && policy switch
-        {
-            UnloadPolicy.Always => true,
-            UnloadPolicy.LargeImages => pixels > options.Value.UnloadAboveMegapixels * 1_000_000,
-            _ => false,
-        };
+        options.Value.Provider == "ollama" && OllamaMemory.ShouldUnloadBeforeOcr(pixels, policy, options.Value.UnloadAboveMegapixels);
 
     /// <summary>GPU 에 올라가 있는 Ollama 모델을 모두 내리고, 실제로 내려갈 때까지(최대 10초) 기다린다</summary>
     public async Task UnloadAllAsync(CancellationToken ct)
     {
         var http = httpFactory.CreateClient(LlmServiceCollectionExtensions.HttpClientName);
-        var loaded = await LoadedModelsAsync(http, ct);
-        if (loaded.Count == 0)
+        if ((await OllamaMemory.LoadedModelsAsync(http, ct)).Count == 0)
         {
             return;
         }
         await Gate.WaitAsync(ct);
         try
         {
-            foreach (var model in loaded)
-            {
-                using var _ = await http.PostAsJsonAsync("api/generate", new { model, keep_alive = 0 }, ct);
-            }
-            for (var i = 0; i < 20 && (await LoadedModelsAsync(http, ct)).Count > 0; i++)
-            {
-                await Task.Delay(500, ct);
-            }
+            await OllamaMemory.UnloadAllAsync(http, ct);
         }
         finally
         {
             Gate.Release();
         }
-    }
-
-    private static async Task<List<string>> LoadedModelsAsync(HttpClient http, CancellationToken ct)
-    {
-        var ps = await http.GetFromJsonAsync<JsonObject>("api/ps", ct);
-        return ps?["models"]?.AsArray().Select(m => m?["name"]?.GetValue<string>()).OfType<string>().ToList() ?? [];
     }
 
     public IReadOnlyList<string> Models => options.Value.Models;

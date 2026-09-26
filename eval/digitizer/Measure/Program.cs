@@ -30,7 +30,7 @@ switch (args.FirstOrDefault())
         var inputs = Opt("--inputs", "pdf,docx,scan").Split(',');
         var ocrEngine = args.Contains("--ocr-engine") ? Opt("--ocr-engine", "") : null;
         var outDir = Directory.CreateDirectory(Path.Combine(repo, "eval", "results", "digitizer", Opt("--out", $"{split}-text"))).FullName;
-        var extractor = new TextExtractor(new OcrClient(ocrHttp, ocrEngine));
+        var extractor = new TextExtractor(new OcrClient(ocrHttp, ocrEngine), type.ReadingOrder);  // 팩의 줄 순서 방식 (이력서 center)
         var path = Path.Combine(outDir, "texts.jsonl");
         // 실패한 기록(예: OCR 서비스가 뜨기 전 연결 거부)은 지우고 다시 시도
         var kept = File.Exists(path) ? File.ReadAllLines(path).Where(l => JsonNode.Parse(l)!["error"] is null).ToList() : [];
@@ -94,7 +94,9 @@ switch (args.FirstOrDefault())
         {
             // 모델을 먼저 내림: CPU 측정(num_gpu=0)으로 올라간 인스턴스가 남아 있으면 GPU 요청도 그걸로 처리됨 (VRAM 0GB 로 43초)
             await ollama.PostAsync("api/generate", new StringContent(new JsonObject { ["model"] = model, ["keep_alive"] = 0 }.ToJsonString(), Encoding.UTF8, "application/json"));
-            var processor = new DocumentProcessor(new TextExtractor(new OcrClient(ocrHttp)), new FieldExtractor(ollama, new LlmOptions(model, CpuOnly: cpu)));
+            // 평가 도구 · exe 와 같은 처리 흐름 (4차-exe 1단계). 측정은 폴백 없이 원문 텍스트만, 문장은 팩 파일 그대로
+            var extractor = new FieldExtractor(ollama, new LlmOptions(model, CpuOnly: cpu));
+            var processor = new DocumentProcessor(_ => extractor, PackPromptSource.Instance);
             for (var rep = 1; rep <= reps; rep++)
             {
                 foreach (var t in texts)
@@ -103,30 +105,34 @@ switch (args.FirstOrDefault())
                     var input = t["input"]!.GetValue<string>();
                     if (!done.Add(Key(model, cpu, id, input, rep))) continue;
                     var source = new SourceText(t["text"]!.GetValue<string>(), t["source"]!.GetValue<string>(), t["pages"]!.GetValue<int>(), t["ms"]!.GetValue<long>());
-                    ProcessResult r;
+                    ExtractionAttempt a;
                     try
                     {
-                        r = await processor.ProcessFromTextAsync(type, source);
+                        var document = new DocumentText(source.Text, Structured: false, FieldExtractor.InputLabel(source.Source));
+                        var processed = await processor.ProcessAsync(type, new ProcessInput(document, OcrConfidence: null, LoadImage: null),
+                            new ProcessOptions(model, VlmFallback: false, FallbackConfidence: 0));
+                        a = processed.Final ?? new ExtractionAttempt(ExtractionAttempt.Text, model, 0, null, null, false, "원문 텍스트 없음", null, [], "");
                     }
                     catch (Exception e)
                     {
-                        r = new ProcessResult(type.Id, type.Version, source, new Extraction(null, "", 0, 0, 0, 0, $"{e.GetType().Name}: {e.Message}"), []);
+                        a = new ExtractionAttempt(ExtractionAttempt.Text, model, 0, null, null, false, $"{e.GetType().Name}: {e.Message}", null, [], "");
                     }
+                    var needsReview = a.Fields is null || a.ErrorCount > 0;
                     var record = new JsonObject
                     {
                         ["id"] = id, ["input"] = input, ["model"] = model, ["cpu"] = cpu, ["rep"] = rep,
                         ["type_version"] = type.Version, ["engine_version"] = engineVersion,
-                        ["text_ms"] = source.ElapsedMs, ["llm_ms"] = r.Extraction.ElapsedMs,
-                        ["input_tokens"] = r.Extraction.InputTokens, ["output_tokens"] = r.Extraction.OutputTokens,
-                        ["attempts"] = r.Extraction.Attempts, ["error"] = r.Extraction.Error,
-                        ["fields"] = r.Fields?.DeepClone(), ["raw"] = r.Fields is null ? r.Extraction.Raw : null,
-                        ["needs_review"] = r.NeedsReview,
-                        ["issues"] = new JsonArray([.. r.Issues.Select(i => (JsonNode)new JsonObject
+                        ["text_ms"] = source.ElapsedMs, ["llm_ms"] = a.ElapsedMs,
+                        ["input_tokens"] = a.PromptTokens, ["output_tokens"] = a.CompletionTokens,
+                        ["error"] = a.ParseError,
+                        ["fields"] = a.Fields?.DeepClone(), ["raw"] = a.Fields is null ? a.Raw : null,
+                        ["needs_review"] = needsReview,
+                        ["issues"] = new JsonArray([.. a.Issues.Select(i => (JsonNode)new JsonObject
                             { ["rule"] = i.Rule, ["path"] = i.Field, ["severity"] = i.Severity.ToString(), ["message"] = i.Message })]),
                     };
                     await File.AppendAllTextAsync(path, record.ToJsonString(json) + "\n");
-                    Console.WriteLine($"{model}{(cpu ? " (CPU)" : "")} r{rep} {id} {input} · {r.Extraction.ElapsedMs / 1000.0:0.0}초 · 문제 {r.Issues.Count(i => i.Severity == IssueSeverity.Error)}" +
-                        (r.Extraction.Error is null ? "" : " · " + r.Extraction.Error));
+                    Console.WriteLine($"{model}{(cpu ? " (CPU)" : "")} r{rep} {id} {input} · {a.ElapsedMs / 1000.0:0.0}초 · 문제 {a.Issues.Count(i => i.Severity == IssueSeverity.Error)}" +
+                        (a.ParseError is null ? "" : " · " + a.ParseError));
                 }
             }
         }

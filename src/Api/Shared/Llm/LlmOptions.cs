@@ -1,15 +1,7 @@
-using System.Text.Json.Serialization;
+using Digitizer.Engine;
 
 namespace Api.Shared.Llm;
 
-/// <summary>API 본문(설정 PUT 등)에서도 이름으로 주고받도록 문자열 변환기를 붙인다</summary>
-[JsonConverter(typeof(JsonStringEnumConverter<UnloadPolicy>))]
-public enum UnloadPolicy
-{
-    Never,
-    Always,
-    LargeImages,
-}
 
 public sealed class LlmOptions
 {

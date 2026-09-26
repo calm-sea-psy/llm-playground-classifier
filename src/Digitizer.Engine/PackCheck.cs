@@ -51,6 +51,9 @@ public static partial class PackCheck
         foreach (var dup in (type.Rules ?? []).GroupBy(r => r).Where(g => g.Count() > 1))
             errors.Add($"규칙 {dup.Key} 가 두 번 있습니다");
 
+        if (!Engine.ReadingOrder.Modes.Contains(type.ReadingOrder))
+            errors.Add($"reading_order 는 {string.Join(" · ", Engine.ReadingOrder.Modes)} 중 하나여야 합니다 (지금 {type.ReadingOrder})");
+
         if (type.Release is { } release)
         {
             if (release.Status is not (PackRelease.Passed or PackRelease.Conditional))

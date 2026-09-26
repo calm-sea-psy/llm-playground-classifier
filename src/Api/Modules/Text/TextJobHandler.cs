@@ -5,7 +5,6 @@ using Api.Modules.Text.Ocr;
 using Api.Modules.Text.Pipeline;
 using Api.Modules.Text.Settings;
 using Api.Shared.Data;
-using Api.Shared.Imaging;
 using Api.Shared.Jobs;
 using Api.Shared.Llm;
 using Api.Shared.Storage;
@@ -16,7 +15,8 @@ namespace Api.Modules.Text;
 
 /// <summary>
 /// Step 1 작업 처리: 원문 (이미지 OCR · PDF · DOCX) ➔ ClassifyDocument (문서 종류를 지정하면 생략) ➔ ExtractFields (팩 + Engine)
-/// ➔ ValidateFields ➔ (VLM 폴백 ➔ 재검증, 원본이 이미지일 때만) ➔ SaveResult
+/// ➔ ValidateFields ➔ (VLM 폴백 ➔ 재검증, 원본이 이미지일 때만) ➔ SaveResult.
+/// 추출 ~ 최종 선택은 Engine DocumentProcessor (exe 와 같은 흐름), 여기는 원문 · 분류 · 진행 표시 · 저장만
 /// </summary>
 public sealed class TextJobHandler(
     IOcrEngine ocr,
@@ -42,6 +42,8 @@ public sealed class TextJobHandler(
         var isDocument = JobFactory.IsDocument(job.FileName);
         DocumentText document;
         double? ocrConfidence;
+        // 종류를 알기 전에는 기본 줄 순서(top), 팩이 정해지면 그 팩의 방식으로 다시 만듦 (OCR 원문만)
+        Func<string, string>? reorder = null;
         if (isDocument)
         {
             await reporter.SetStatusAsync(job, JobStatus.OcrRunning, "원문 추출 중 (PDF 텍스트 층 · DOCX, 스캔 PDF 는 OCR)", ct);
@@ -50,14 +52,16 @@ public sealed class TextJobHandler(
             await storage.WriteTextAsync(job.Id, "source.txt", source.Text, ct);
             document = new DocumentText(source.Text, Structured: false, FieldExtractor.InputLabel(source.Source));
             ocrConfidence = source.OcrConfidence;
+            reorder = mode => source.WithReadingOrder(mode).Text;
         }
         else
         {
             var ocrResult = await RunOcrAsync(job, settings, reporter, ct);
             // 경로 B(문서 파싱 엔진)는 표 구조가 보존된 Markdown, 경로 A 는 줄 좌표로 만든 읽기 순서 텍스트
             var structured = !string.IsNullOrWhiteSpace(ocrResult.Markdown);
-            document = new DocumentText(structured ? ocrResult.Markdown! : ReadingOrder.Build(ocrResult), structured);
+            document = new DocumentText(structured ? ocrResult.Markdown! : ocrResult.ReadingText(), structured);
             ocrConfidence = ocrResult.AvgConfidence;
+            if (!structured) reorder = ocrResult.ReadingText;
         }
         var readingText = document.Text;
         var model = settings.Model;
@@ -85,53 +89,29 @@ public sealed class TextJobHandler(
             return $"완료: 지원하지 않는 문서 종류 ({documentType})";
         }
 
-        // 2) ExtractFields (OCR 텍스트) + 3) ValidateFields
-        var attempts = new List<ExtractionAttempt>();
-        ExtractionAttempt? textAttempt = null;
-        if (readingText.Length > 0)
+        if (reorder is not null && pack.ReadingOrder != ReadingOrder.Top)
         {
-            await reporter.SetStatusAsync(job, JobStatus.LlmRunning,
-                $"LLM 구조화 중: 필드 추출 ({pack.DisplayName}, {model})", ct);
-            textAttempt = await pipeline.ExtractFieldsAsync(model, documentType, document, null, null, ct);
-            attempts.Add(textAttempt);
-            await reporter.SetStatusAsync(job, JobStatus.Validating, $"검증: {Summary(textAttempt)}", ct);
+            document = document with { Text = reorder(pack.ReadingOrder) };
+            readingText = document.Text;
         }
 
-        // 4) 검증 실패 or 신뢰도 미달 ➔ VLM 폴백 ➔ 재검증
-        var reasons = new List<string>();
-        if (textAttempt is null)
-        {
-            reasons.Add("OCR 텍스트 없음");
-        }
-        else if (textAttempt.ErrorCount > 0)
-        {
-            reasons.Add($"검증 오류 {textAttempt.ErrorCount}건");
-        }
-        if (ocrConfidence is { } confidence && confidence < settings.FallbackConfidence)
-        {
-            reasons.Add($"OCR 평균 신뢰도 {confidence:0.00} < {settings.FallbackConfidence:0.00}");
-        }
-        // VLM 폴백: 원본이 이미지이고 팩에 이미지 폴백 틀(vlm.user.md)이 있을 때만 (이력서 팩은 폴백 없이 측정)
-        string? fallbackReason = settings.VlmFallback && !isDocument && pack.VlmUserTemplate is not null && reasons.Count > 0
-            ? string.Join(", ", reasons) : null;
-        if (fallbackReason is not null)
-        {
-            await reporter.SetStatusAsync(job, JobStatus.LlmRunning, $"VLM 폴백 추출 중 ({fallbackReason})", ct);
-            var vlmAttempt = await pipeline.ExtractFieldsAsync(
-                model, documentType, document, VlmImage(), textAttempt?.Issues, ct);
-            attempts.Add(vlmAttempt);
-            await reporter.SetStatusAsync(job, JobStatus.Validating, $"재검증: {Summary(vlmAttempt)}", ct);
-        }
+        // 2) ExtractFields ➔ 3) ValidateFields ➔ 4) (검증 실패 or 신뢰도 미달 ➔ VLM 폴백 ➔ 재검증) ➔ 최종 선택
+        var processor = pipeline.CreateProcessor((stage, message, token) => reporter.SetStatusAsync(job,
+            stage is ProcessStage.Validated or ProcessStage.Revalidated ? JobStatus.Validating : JobStatus.LlmRunning, message, token));
+        var processed = await processor.ProcessAsync(pack,
+            new ProcessInput(document, ocrConfidence, isDocument ? null : () => ToImageInput(VlmImage())),
+            new ProcessOptions(model, settings.VlmFallback, settings.FallbackConfidence), ct);
+        var attempts = processed.Attempts.ToList();
+        var fallbackReason = processed.FallbackReason;
 
         // 원문이 비었고 이미지도 없어(PDF · DOCX) 폴백할 수 없으면 추출 없이 끝냄
-        if (attempts.Count == 0)
+        if (processed.Final is not { } final)
         {
             await SaveResultAsync(job, model, classification, readingText, final: null, attempts: [], fallbackReason: null, ct);
             return $"완료: 원문 텍스트가 없어 필드를 추출하지 못했습니다 ({pack.DisplayName})";
         }
 
         // 5) SaveResult
-        var final = ChooseFinal(textAttempt, attempts.FirstOrDefault(a => a.Source == ExtractionAttempt.Vlm));
         await SaveResultAsync(job, model, classification, readingText, final, attempts, fallbackReason, ct);
 
         var llmMs = classification.ElapsedMs + attempts.Sum(a => a.ElapsedMs);
@@ -184,29 +164,7 @@ public sealed class TextJobHandler(
         return result;
     }
 
-    /// <summary>
-    /// VLM 결과가 검증을 통과하면 VLM, 아니면 통과한 텍스트 결과, 둘 다 실패면 오류가 적은 쪽 (같으면 숫자 환각 위험이 낮은 텍스트)
-    /// </summary>
-    private static ExtractionAttempt ChooseFinal(ExtractionAttempt? text, ExtractionAttempt? vlm) => (text, vlm) switch
-    {
-        (not null, null) => text,
-        (null, not null) => vlm,
-        (not null, not null) when vlm.ErrorCount == 0 => vlm,
-        (not null, not null) when text.ErrorCount == 0 => text,
-        (not null, not null) => vlm.ErrorCount < text.ErrorCount ? vlm : text,
-        _ => throw new InvalidOperationException("추출 시도가 없습니다"),
-    };
-
-    private static string Summary(ExtractionAttempt attempt)
-    {
-        if (!attempt.SchemaValid)
-        {
-            return $"스키마 위반 ({attempt.ParseError})";
-        }
-        var errors = attempt.Issues.Count(i => i.Severity == IssueSeverity.Error);
-        var warnings = attempt.Issues.Count - errors;
-        return errors == 0 ? $"통과 (경고 {warnings}건)" : $"오류 {errors}건, 경고 {warnings}건";
-    }
+    private static ImageInput ToImageInput(LlmImage image) => new(image.Data, image.MimeType);
 
     private LlmImage LoadVlmImage(Job job, int maxSide)
     {

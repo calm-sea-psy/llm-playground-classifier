@@ -3,6 +3,7 @@
   "version": "0.2.0",
   "display_name": "이력서",
   "description": "입사 지원 이력서의 인적사항 · 학력 · 경력 · 자격증 · 어학 · 기술",
+  "reading_order": "center",
   "release": {
     "status": "conditional",
     "report": "docs/pack_reports.md#이력서-resume",

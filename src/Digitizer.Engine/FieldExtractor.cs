@@ -16,11 +16,17 @@ public sealed record Extraction(JsonObject? Fields, string Raw, long ElapsedMs, 
 /// <summary>이미지 입력 (VLM 폴백)</summary>
 public sealed record ImageInput(byte[] Data, string MediaType);
 
+/// <summary>팩 정의 + 지시문 + 원문 ➔ 필드 JSON (DocumentProcessor 가 부름, 테스트는 가짜로 바꿔 끼움)</summary>
+public interface IFieldExtractor
+{
+    Task<Extraction> ExtractMessagesAsync(DocumentType type, string system, string user, IReadOnlyList<ImageInput>? images, CancellationToken ct = default);
+}
+
 /// <summary>
 /// 원문 ➔ 필드 (LLM 1회, 형식 오류면 1회 재시도). 스키마는 문서 종류 정의에서 만든다.
 /// 도구 없이 JSON 스키마(format)만 씀, think 끔, num_ctx 지정 (docs/agent_evaluation.md 에서 확인한 설정)
 /// </summary>
-public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
+public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options) : IFieldExtractor
 {
     /// <summary>원문 종류별 안내 문구 (영수증 user.md 의 {{$input_label}}). ocr 은 평가 도구 DocumentText.Label 과 같은 문장</summary>
     public static string InputLabel(string? source) => source switch

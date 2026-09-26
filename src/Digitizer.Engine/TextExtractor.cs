@@ -9,14 +9,21 @@ using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 
 namespace Digitizer.Engine;
 
-/// <summary>추출된 원문. Source: pdf-text · docx · ocr</summary>
-public sealed record SourceText(string Text, string Source, int Pages, long ElapsedMs, double? OcrConfidence = null);
+/// <summary>추출된 원문. Source: pdf-text · docx · ocr. OcrPages = OCR 줄 (쪽마다, 읽기 순서 방식을 바꿔 다시 만들 때)</summary>
+public sealed record SourceText(string Text, string Source, int Pages, long ElapsedMs, double? OcrConfidence = null,
+    IReadOnlyList<IReadOnlyList<OcrBox>>? OcrPages = null)
+{
+    /// <summary>OCR 원문이면 다른 읽기 순서 방식으로 다시 만든 텍스트 (종류를 분류한 뒤 팩의 방식을 알게 될 때)</summary>
+    public SourceText WithReadingOrder(string mode) => OcrPages is null
+        ? this
+        : this with { Text = string.Join("\n\n", OcrPages.Select(p => ReadingOrder.Build(p, mode))) };
+}
 
 /// <summary>
 /// 원문 텍스트 추출. PDF 는 텍스트 층을 먼저 쓰고, 텍스트가 거의 없으면(스캔 PDF) 페이지 이미지를 OCR.
-/// DOCX 는 문단 · 표를 문서 순서대로 (표는 칸을 " | " 로 이음). 이미지는 OCR
+/// DOCX 는 문단 · 표를 문서 순서대로 (표는 칸을 " | " 로 이음). 이미지는 OCR (줄 순서는 readingOrder 방식 = 팩의 reading_order)
 /// </summary>
-public sealed class TextExtractor(OcrClient ocr)
+public sealed class TextExtractor(OcrClient ocr, string readingOrder = ReadingOrder.Top)
 {
     private const int MinTextLayerChars = 30;
 
@@ -58,16 +65,16 @@ public sealed class TextExtractor(OcrClient ocr)
 
     private async Task<SourceText> OcrImages(List<byte[]> images, Stopwatch sw, CancellationToken ct)
     {
-        var pages = new List<string>();
+        var pages = new List<IReadOnlyList<OcrBox>>();
         var confidences = new List<double>();
         foreach (var image in images)
         {
             var result = await ocr.RecognizeAsync(image, ct);
-            pages.Add(result.Text);
+            pages.Add(result.Boxes);
             if (result.AvgConfidence is { } c) confidences.Add(c);
         }
-        return new SourceText(string.Join("\n\n", pages), "ocr", images.Count, sw.ElapsedMilliseconds,
-            confidences.Count > 0 ? confidences.Average() : null);
+        return new SourceText(string.Join("\n\n", pages.Select(p => ReadingOrder.Build(p, readingOrder))), "ocr", images.Count,
+            sw.ElapsedMilliseconds, confidences.Count > 0 ? confidences.Average() : null, pages);
     }
 
     private static string Docx(string path)
@@ -93,7 +100,7 @@ public sealed class TextExtractor(OcrClient ocr)
     private static string Normalize(string text) => text.Replace("\r\n", "\n").Trim();
 }
 
-/// <summary>OCR 서비스 (Python FastAPI, POST /ocr) 호출. 줄을 위에서 아래 · 왼쪽에서 오른쪽 순서로 묶어 텍스트로</summary>
+/// <summary>OCR 서비스 (Python FastAPI, POST /ocr) 호출. 줄은 ReadingOrder 로 읽기 순서 텍스트로</summary>
 public sealed class OcrClient(HttpClient http, string? engine = null)
 {
     public sealed record OcrLine([property: JsonPropertyName("text")] string Text,
@@ -103,7 +110,8 @@ public sealed class OcrClient(HttpClient http, string? engine = null)
     private sealed record OcrResponse([property: JsonPropertyName("lines")] List<OcrLine> Lines,
         [property: JsonPropertyName("avg_confidence")] double? AvgConfidence);
 
-    public sealed record OcrText(string Text, double? AvgConfidence, int LineCount);
+    /// <param name="Text">기본 방식(top) 읽기 순서 텍스트</param>
+    public sealed record OcrText(string Text, double? AvgConfidence, int LineCount, IReadOnlyList<OcrBox> Boxes);
 
     public async Task<OcrText> RecognizeAsync(byte[] image, CancellationToken ct = default)
     {
@@ -113,37 +121,7 @@ public sealed class OcrClient(HttpClient http, string? engine = null)
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"OCR 오류 {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync(ct)}");
         var result = await response.Content.ReadFromJsonAsync<OcrResponse>(ct) ?? throw new InvalidDataException("OCR 응답이 비었습니다");
-        return new OcrText(ToText(result.Lines), result.AvgConfidence, result.Lines.Count);
-    }
-
-    /// <summary>세로 중심이 줄 높이의 절반 안이면 같은 행 ➔ 행 안에서는 왼쪽부터 (표의 칸이 한 행으로 모임)</summary>
-    public static string ToText(List<OcrLine> lines)
-    {
-        var boxes = lines.Where(l => l.Bbox is { Count: > 0 }).Select(l =>
-        {
-            var ys = l.Bbox!.Select(p => p[1]).ToList();
-            var xs = l.Bbox!.Select(p => p[0]).ToList();
-            return (l.Text, Top: ys.Min(), Bottom: ys.Max(), Left: xs.Min());
-        }).OrderBy(b => (b.Top + b.Bottom) / 2.0).ToList();
-
-        var rows = new List<List<(string Text, int Top, int Bottom, int Left)>>();
-        foreach (var b in boxes)
-        {
-            var center = (b.Top + b.Bottom) / 2.0;
-            var row = rows.LastOrDefault();
-            if (row is not null)
-            {
-                var rowCenter = row.Average(r => (r.Top + r.Bottom) / 2.0);
-                var rowHeight = row.Average(r => r.Bottom - r.Top);
-                if (Math.Abs(center - rowCenter) <= rowHeight / 2)
-                {
-                    row.Add(b);
-                    continue;
-                }
-            }
-            rows.Add([b]);
-        }
-        var noBox = lines.Where(l => l.Bbox is not { Count: > 0 }).Select(l => l.Text);
-        return string.Join("\n", rows.Select(r => string.Join("  ", r.OrderBy(b => b.Left).Select(b => b.Text))).Concat(noBox));
+        var boxes = result.Lines.Select(l => new OcrBox(l.Text, l.Bbox?.Select(p => p.ToArray()).ToArray())).ToList();
+        return new OcrText(ReadingOrder.Build(boxes), result.AvgConfidence, result.Lines.Count, boxes);
     }
 }

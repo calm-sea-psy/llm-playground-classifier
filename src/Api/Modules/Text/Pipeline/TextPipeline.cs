@@ -23,40 +23,7 @@ public sealed class PipelineOptions
     public string PacksRoot { get; set; } = "../../packs";
 }
 
-/// <summary>
-/// LLM 에 넣을 문서 텍스트. Structured = 문서 파싱 엔진의 Markdown(표는 HTML), 아니면 OCR 줄 읽기 순서 텍스트.
-/// SourceLabel = PDF 텍스트 층 · DOCX 처럼 OCR 이 아닌 원문일 때의 안내 (FieldExtractor.InputLabel)
-/// </summary>
-public sealed record DocumentText(string Text, bool Structured, string? SourceLabel = null)
-{
-    public string Label => SourceLabel ?? (Structured
-        ? "문서 파싱 결과 (Markdown, 표는 HTML 로 칸 구조 유지)"
-        : "OCR 텍스트 (위➔아래, 같은 줄은 왼쪽➔오른쪽 순서)");
-}
-
 public sealed record Classification(string DocumentType, int ElapsedMs, string Raw, string? ParseError);
-
-/// <summary>추출 1회 기록. 텍스트 추출과 VLM 폴백 추출을 모두 남겨 5단계 모델 비교 지표로 쓴다</summary>
-public sealed record ExtractionAttempt(
-    string Source,
-    string Model,
-    int ElapsedMs,
-    int? PromptTokens,
-    int? CompletionTokens,
-    bool SchemaValid,
-    string? ParseError,
-    JsonObject? Fields,
-    List<ValidationIssue> Issues,
-    string Raw,
-    /// <summary>추출에 쓴 문서 종류 팩 "팩@버전" (예: receipt@1.0.0). 4차 통합 전 기록은 null (기존 추출)</summary>
-    string? Engine = null)
-{
-    public const string Text = "text";
-    public const string Vlm = "vlm";
-
-    /// <summary>스키마 위반도 오류 1건으로 셈</summary>
-    public int ErrorCount => Issues.Count(i => i.Severity == IssueSeverity.Error) + (SchemaValid ? 0 : 1);
-}
 
 public static class PipelineJson
 {
@@ -110,71 +77,43 @@ public sealed class TextPipeline(
     }
 
     /// <summary>
-    /// 필드 추출: 문서 종류 팩(packs/{종류}) + Digitizer.Engine (평가 도구 · exe 가 같은 엔진).
-    /// 지시문 · 사용자 메시지는 프롬프트 관리 화면의 적용 버전으로 렌더링 (파일 기본값의 원본은 팩).
-    /// 4차 통합: 기존(legacy) 추출은 KORIE 150장 · AI Hub 상업송장 · 보험 청구서 30장씩에서 결과가 같음을 확인하고 삭제
+    /// 필드 추출 · 검증 · VLM 폴백 · 최종 선택 = Engine DocumentProcessor (exe 와 같은 흐름).
+    /// 문장은 ManagedPromptSource: 프롬프트 관리에 있는 종류는 적용 버전, 없는 종류는 팩 파일
     /// </summary>
-    /// <param name="image">null 이면 OCR 텍스트만으로 추출, 있으면 VLM 폴백 (이미지 + OCR 텍스트)</param>
-    /// <param name="previousIssues">폴백 때 텍스트 추출에서 발견된 문제를 힌트로 전달</param>
-    public async Task<ExtractionAttempt> ExtractFieldsAsync(
-        string model,
-        string documentType,
-        DocumentText document,
-        LlmImage? image,
-        IReadOnlyList<ValidationIssue>? previousIssues,
-        CancellationToken ct)
+    public DocumentProcessor CreateProcessor(Func<ProcessStage, string, CancellationToken, Task>? onStatus = null)
     {
-        var pack = packs.Get(documentType)
-            ?? throw new InvalidOperationException($"문서 종류 팩이 없습니다: {Path.Combine(packs.Root, documentType)}");
-        // 규칙을 "맞추라"고 하면 모델이 값을 계산해 바꿔 버림 (7×1,980=13,860 을 만들어 냄) ➔ 이미지 확인만 요청
-        var issueHint = previousIssues is { Count: > 0 }
-            ? "OCR 텍스트로 먼저 추출한 결과를 규칙으로 검사했더니 아래 항목이 맞지 않았습니다. " +
-              "OCR 오인식일 수 있으니 해당 값들을 이미지에서 직접 확인해 인쇄된 그대로 옮기세요. " +
-              "규칙을 맞추려고 값을 계산하거나 바꾸지 마세요. 이미지와 같다면 그대로 둡니다.\n" +
-              string.Join("\n", previousIssues.Where(i => i.Severity == IssueSeverity.Error).Select(i => $"- {i.Message}"))
-            : "";
-
-        // 지시문 · 메시지: 프롬프트 저장소에 있는 종류(영수증 · 상업송장 · 보험 청구서)는 저장소에서 (화면에서 고친 버전 적용),
-        // 없는 종류(이력서 등 새 팩)는 팩 파일 그대로 (측정한 문장 = 쓰는 문장)
-        var managed = prompts.Has($"extract.{documentType}");
-        var system = managed
-            ? await prompts.RenderForModelAsync($"extract.{documentType}", model,
-                new(pack.Variables.ToDictionary(v => v.Key, v => (object?)v.Value)), ct)
-            : pack.SystemPromptFor(model);
-        string user;
-        if (image is null)
-        {
-            user = managed && pack.UserTemplate is not null
-                ? await prompts.RenderAsync("extract.user", new() { ["ocr_text"] = document.Text, ["input_label"] = document.Label }, ct)
-                : pack.UserMessage(document.Label, document.Text);
-        }
-        else
-        {
-            var template = pack.VlmUserTemplate
-                ?? throw new InvalidOperationException($"{pack.Id} 팩에 이미지 폴백 틀(vlm.user.md)이 없습니다");
-            var values = new Dictionary<string, string> { ["ocr_text"] = document.Text, ["input_label"] = document.Label, ["issues"] = issueHint };
-            user = managed
-                ? await prompts.RenderAsync("extract.vlm.user", new(values.ToDictionary(v => v.Key, v => (object?)v.Value)), ct)
-                : DocumentType.Render(template, values);
-        }
-
         var o = llmOptions.Value;
-        var extractor = new FieldExtractor(httpFactory.CreateClient(EngineHttpClient),
-            new EngineLlmOptions(model, o.ContextLength, o.KeepAlive, MaxOutputTokens: o.MaxOutputTokens));
-        var result = await extractor.ExtractMessagesAsync(pack, system, user,
-            image is null ? null : [new ImageInput(image.Data, image.MimeType)], ct);
-
-        var fields = result.Fields;
-        var parseError = result.Error;
-        if (fields is not null)
+        return new DocumentProcessor(
+            model => new FieldExtractor(httpFactory.CreateClient(EngineHttpClient),
+                new EngineLlmOptions(model, o.ContextLength, o.KeepAlive, MaxOutputTokens: o.MaxOutputTokens)),
+            new ManagedPromptSource(prompts))
         {
-            var missing = pack.Fields.Select(f => f.Name).Where(k => !fields.ContainsKey(k)).ToList();
-            if (missing.Count > 0) parseError = $"필드 누락: {string.Join(", ", missing)}";
-        }
-        // 팩 rules: 보정(영수증 수량) ➔ 종류별 규칙 ➔ 근거 확인(텍스트 추출만, VLM 은 이미지를 직접 봄)
-        var issues = fields is null ? [] : Validator.Validate(pack, fields, document.Text, fromImage: image is not null);
-        return new ExtractionAttempt(image is null ? ExtractionAttempt.Text : ExtractionAttempt.Vlm, model, (int)result.ElapsedMs,
-            (int?)result.InputTokens, (int?)result.OutputTokens, SchemaValid: parseError is null, parseError, fields, issues, result.Raw,
-            Engine: $"{pack.Id}@{pack.Version}");
+            OnStatus = onStatus,
+        };
     }
+}
+
+/// <summary>
+/// 평가 도구의 추출 문장: 프롬프트 저장소에 있는 종류(영수증 · 상업송장 · 보험 청구서)는 저장소에서 (화면에서 고친 버전 적용),
+/// 없는 종류(이력서 등 새 팩)는 팩 파일 그대로. exe 는 PackPromptSource (팩 파일만) ➔ 차이는 문서 종류 화면이 경고 (4차-exe 0-3)
+/// </summary>
+public sealed class ManagedPromptSource(TextPrompts prompts) : IPromptSource
+{
+    private bool Managed(DocumentType pack) => prompts.Has($"extract.{pack.Id}");
+
+    public async Task<string> SystemAsync(DocumentType pack, string model, CancellationToken ct) => Managed(pack)
+        ? await prompts.RenderForModelAsync($"extract.{pack.Id}", model,
+            new(pack.Variables.ToDictionary(v => v.Key, v => (object?)v.Value)), ct)
+        : pack.SystemPromptFor(model);
+
+    public async Task<string> UserAsync(DocumentType pack, DocumentText document, CancellationToken ct) =>
+        Managed(pack) && pack.UserTemplate is not null
+            ? await prompts.RenderAsync("extract.user", new() { ["ocr_text"] = document.Text, ["input_label"] = document.Label }, ct)
+            : pack.UserMessage(document.Label, document.Text);
+
+    public async Task<string> VlmUserAsync(DocumentType pack, DocumentText document, string issues, CancellationToken ct) =>
+        Managed(pack)
+            ? await prompts.RenderAsync("extract.vlm.user",
+                new() { ["ocr_text"] = document.Text, ["input_label"] = document.Label, ["issues"] = issues }, ct)
+            : await PackPromptSource.Instance.VlmUserAsync(pack, document, issues, ct);
 }

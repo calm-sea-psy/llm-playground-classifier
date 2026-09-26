@@ -2,7 +2,7 @@ using System.Text.Json;
 using Api.Modules.Image.Cnn;
 using Api.Modules.Image.Pipeline;
 using Api.Shared.Data;
-using Api.Shared.Imaging;
+using ImageResizer = Digitizer.Engine.ImageResizer;
 using Api.Shared.Jobs;
 using Api.Shared.Llm;
 using Api.Shared.Storage;
