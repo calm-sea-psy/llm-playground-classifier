@@ -51,6 +51,15 @@ public static partial class PackCheck
         foreach (var dup in (type.Rules ?? []).GroupBy(r => r).Where(g => g.Count() > 1))
             errors.Add($"규칙 {dup.Key} 가 두 번 있습니다");
 
+        if (type.Release is { } release)
+        {
+            if (release.Status is not (PackRelease.Passed or PackRelease.Conditional))
+                errors.Add($"release.status 는 {PackRelease.Passed} 또는 {PackRelease.Conditional} 이어야 합니다 (지금 {release.Status})");
+            if (string.IsNullOrWhiteSpace(release.Report)) errors.Add("release.report (측정 보고서) 가 비었습니다");
+            if (release.Status == PackRelease.Conditional && release.Conditions is not { Count: > 0 })
+                errors.Add("조건부 합격(conditional)은 조건(release.conditions)을 하나 이상 적어야 합니다");
+        }
+
         foreach (var fb in type.Forbidden ?? [])
         {
             if (string.IsNullOrWhiteSpace(fb.Id) || string.IsNullOrWhiteSpace(fb.Label)) errors.Add("수집 금지 항목의 id · 이름이 비었습니다");

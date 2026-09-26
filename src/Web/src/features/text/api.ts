@@ -87,6 +87,14 @@ export interface PackField {
   description: string | null
 }
 
+/** 합격 표시 (측정해 기준을 넘은 팩만 exe 에 들어감). conditional = 조건을 지켜야 씀 */
+export interface PackRelease {
+  status: 'passed' | 'conditional'
+  /** 측정 보고서 (저장소 기준 경로, 예: docs/pack_reports.md#…) */
+  report: string
+  conditions?: string[] | null
+}
+
 export interface Pack {
   id: string
   version: string
@@ -98,6 +106,7 @@ export interface Pack {
   rules: string[]
   genericChecks: boolean
   forbidden: string[]
+  release: PackRelease | null
 }
 
 let packsCache: Promise<Pack[]> | null = null
@@ -134,6 +143,7 @@ export interface PackTypeJson {
   fields: PackFieldJson[]
   forbidden: PackForbiddenJson[]
   rules: string[]
+  release?: PackRelease | null
   changelog?: { version: string; date: string; changes: string }[]
   [extra: string]: unknown
 }
@@ -147,6 +157,8 @@ export interface PackDetail {
   managed: boolean
   /** 고치기 전 버전 보관 (packs/{종류}/.history) */
   history: { version: string; savedAt: string }[]
+  /** 프롬프트 관리에서 적용 중인 DB 버전 (문서 처리는 이 문장, exe 는 팩 파일을 씀) */
+  promptOverrides: { name: string; version: number }[]
 }
 
 export interface PackMeta {

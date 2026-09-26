@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- 문서 전산화 배포용 프로그램 (exe). 평가 도구(Api)는 참조하지 않고 Engine + 합격한 팩만 씀 (doc: docs/pack_reports.md) -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Digitizer</AssemblyName>
+    <RootNamespace>Digitizer.App</RootNamespace>
+    <!-- CI(ubuntu)에서도 빌드만은 되게. 실행 · 설치 파일은 Windows 전용 -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <PacksRoot>$(MSBuildThisFileDirectory)..\..\packs\</PacksRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Digitizer.Engine\Digitizer.Engine.csproj" />
+  </ItemGroup>
+
+  <!--
+    합격 표시(type.json 의 "release")가 있는 팩만 출력 · 게시 폴더의 packs\ 로 복사.
+    측정하지 않은 팩(상업송장 · 보험 청구서 등)은 빌드 로그에 남기고 넣지 않음. 앱도 시작할 때 release 를 다시 확인
+  -->
+  <Target Name="IncludeReleasedPacks" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <_PackType Include="$(PacksRoot)*\type.json" />
+      <_PackType Update="@(_PackType)" PackName="$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))" Released="$([System.Text.RegularExpressions.Regex]::IsMatch($([System.IO.File]::ReadAllText('%(FullPath)')), '&quot;release&quot;\s*:'))" />
+      <_ReleasedPackDir Include="@(_PackType->'%(RootDir)%(Directory)')" Condition="'%(Released)' == 'True'" />
+      <_SkippedPack Include="@(_PackType->'%(PackName)')" Condition="'%(Released)' != 'True'" />
+      <_ReleasedPackFile Include="%(_ReleasedPackDir.Identity)type.json;%(_ReleasedPackDir.Identity)*.md" />
+      <Content Include="@(_ReleasedPackFile)"
+               Link="packs\$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))\%(Filename)%(Extension)"
+               CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
+    <Message Importance="high" Text="합격 표시가 없어 exe 에 넣지 않는 팩: @(_SkippedPack, ', ')" Condition="'@(_SkippedPack)' != ''" />
+  </Target>
+
+</Project>

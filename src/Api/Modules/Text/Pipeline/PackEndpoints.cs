@@ -1,6 +1,9 @@
 using System.Text.Json.Nodes;
+using Api.Shared.Data;
+using Api.Shared.Prompts;
 using Digitizer.Engine;
 using Digitizer.Engine.Rules;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Modules.Text.Pipeline;
 
@@ -20,7 +23,11 @@ public static class PackEndpoints
         JsonObject Type,
         Dictionary<string, string> Files,
         bool Managed,
-        IReadOnlyList<PackStore.HistoryEntry> History);
+        IReadOnlyList<PackStore.HistoryEntry> History,
+        IReadOnlyList<PromptOverride> PromptOverrides);
+
+    /// <summary>프롬프트 관리에서 적용 중인 DB 버전. 문서 처리 · 모델 비교는 이 문장을 쓰지만 exe 는 팩 파일을 씀 ➔ 합격 표시 전에 팩에 반영하거나 되돌려야 함</summary>
+    public sealed record PromptOverride(string Name, int Version);
 
     public sealed record SavePackRequest(JsonObject Type, Dictionary<string, string?>? Files, string? Note);
 
@@ -30,10 +37,13 @@ public static class PackEndpoints
             [.. PackCheck.FieldTypes.Select(t => new FieldTypeDto(t.Key, t.Value))],
             [.. RuleRegistry.Names.Select(r => new RuleDto(r, RuleRegistry.Kind(r), RuleRegistry.Descriptions.GetValueOrDefault(r)))]));
 
-        group.MapGet("/{id}", (string id, PackStore packs, TextPrompts prompts) =>
-            packs.Get(id) is { } pack && packs.TypeJson(id) is { } type
-                ? Results.Ok(new PackDetailDto(PackDto.From(pack), type, packs.Files(id), prompts.Has($"extract.{id}"), packs.History(id)))
-                : Results.NotFound());
+        group.MapGet("/{id}", async (string id, PackStore packs, TextPrompts prompts, AppDbContext db, CancellationToken ct) =>
+        {
+            if (packs.Get(id) is not { } pack || packs.TypeJson(id) is not { } type) return Results.NotFound();
+            var managed = prompts.Has($"extract.{id}");
+            var overrides = managed ? await OverridesAsync(db, id, ct) : [];
+            return Results.Ok(new PackDetailDto(PackDto.From(pack), type, packs.Files(id), managed, packs.History(id), overrides));
+        });
 
         group.MapPost("", (SavePackRequest request, PackStore packs) =>
         {
@@ -44,6 +54,15 @@ public static class PackEndpoints
         group.MapPut("/{id}", (string id, SavePackRequest request, PackStore packs) =>
             Result(packs.Save(id, request.Type, request.Files ?? [], request.Note, create: false), packs, id));
     }
+
+    /// <summary>이 팩이 문서 처리에서 쓰는 프롬프트(extract.{id} · 모델 전용 · 공용 user 틀) 중 DB 버전이 적용 중인 것</summary>
+    private static async Task<List<PromptOverride>> OverridesAsync(AppDbContext db, string id, CancellationToken ct) =>
+        await db.Set<PromptVersion>()
+            .Where(p => p.Module == TextModule.ModuleKey && p.Active
+                && (p.Name == $"extract.{id}" || p.Name.StartsWith($"extract.{id}.") || p.Name == "extract.user" || p.Name == "extract.vlm.user"))
+            .OrderBy(p => p.Name)
+            .Select(p => new PromptOverride(p.Name, p.Version))
+            .ToListAsync(ct);
 
     private static IResult Result(List<string> errors, PackStore packs, string id) => errors.Count == 0
         ? Results.Ok(PackDto.From(packs.Get(id)!))

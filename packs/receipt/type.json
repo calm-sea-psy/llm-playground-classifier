@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "display_name": "영수증",
   "description": "한국 소매점 영수증 (평가 도구 Text 모듈에서 KORIE 150장으로 측정 · 선정된 설정을 팩으로 옮김)",
+  "release": {
+    "status": "passed",
+    "report": "docs/pack_reports.md#영수증-receipt"
+  },
   "generic_checks": false,
   "variables": {
     "amount_rule": "금액은 원 단위 정수로, 쉼표·'원'·통화 기호를 뺍니다 (예: \"12,850원\" → 12850)."

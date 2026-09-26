@@ -23,6 +23,19 @@ public sealed record ForbiddenDef(
     [property: JsonPropertyName("pattern")] string? Pattern = null);
 
 /// <summary>
+/// 합격 표시: 평가 도구에서 측정해 기준을 넘은 팩만 exe 에 들어감. Status = passed | conditional (조건부: Conditions 를 지켜야 씀),
+/// Report = 측정 보고서 (저장소 기준 경로, 예: docs/pack_reports.md#resume)
+/// </summary>
+public sealed record PackRelease(
+    [property: JsonPropertyName("status")] string Status,
+    [property: JsonPropertyName("report")] string Report,
+    [property: JsonPropertyName("conditions")] List<string>? Conditions = null)
+{
+    public const string Passed = "passed";
+    public const string Conditional = "conditional";
+}
+
+/// <summary>
 /// 문서 종류 팩 (packs/{id}/). 엔진은 이 정의만 보고 동작하고 종류별 코드는 두지 않는다.
 /// 새 종류 = 팩 추가 ➔ 평가 도구에서 측정 ➔ 기준을 넘으면 exe 에 포함
 /// 파일: type.json (필드 · 규칙 · 변수) · prompt.md (지시문, {{$변수}}) · prompt.{모델 계열}.md (선택, 예: prompt.qwen3-vl.md)
@@ -40,6 +53,9 @@ public sealed partial record DocumentType(
     [JsonPropertyName("generic_checks")] public bool GenericChecks { get; init; } = true;
 
     [JsonPropertyName("description")] public string? Description { get; init; }
+
+    /// <summary>없으면 평가 도구에서만 씀 (exe 에 넣지 않음)</summary>
+    [JsonPropertyName("release")] public PackRelease? Release { get; init; }
 
     /// <summary>프롬프트 틀의 {{$이름}} 에 넣을 값 (예: 영수증 amount_rule)</summary>
     [JsonPropertyName("variables")] public Dictionary<string, string> Variables { get; init; } = [];

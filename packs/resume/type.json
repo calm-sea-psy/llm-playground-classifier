@@ -3,6 +3,14 @@
   "version": "0.2.0",
   "display_name": "이력서",
   "description": "입사 지원 이력서의 인적사항 · 학력 · 경력 · 자격증 · 어학 · 기술",
+  "release": {
+    "status": "conditional",
+    "report": "docs/pack_reports.md#이력서-resume",
+    "conditions": [
+      "검증을 끄지 않음 (지어낸 값은 생기지만 검증이 모두 잡음)",
+      "모든 문서를 사람이 검수 (검증을 통과해도 자동 승인하지 않음)"
+    ]
+  },
   "field_types": {
     "text": "짧은 문자열. 원문에 있어야 함 (공백 무시)",
     "longtext": "긴 설명 (담당 업무 등). 원문 근거는 핵심 단어로만 확인",

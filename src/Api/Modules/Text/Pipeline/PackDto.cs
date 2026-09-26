@@ -13,11 +13,13 @@ public sealed record PackDto(
     IReadOnlyList<FieldDef> Fields,
     IReadOnlyList<string> Rules,
     bool GenericChecks,
-    IReadOnlyList<string> Forbidden)
+    IReadOnlyList<string> Forbidden,
+    PackRelease? Release)
 {
     public static PackDto From(DocumentType p) => new(
         p.Id, p.Version, p.DisplayName, p.Description,
         DocumentTypes.Extractable.Contains(p.Id),
         p.Fields, p.Rules, p.GenericChecks,
-        [.. p.Forbidden.Select(f => f.Label)]);
+        [.. p.Forbidden.Select(f => f.Label)],
+        p.Release);
 }

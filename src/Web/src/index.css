@@ -1674,3 +1674,20 @@ label.pack-check {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+.pack-editor textarea:not(.prompt-textarea) {
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+.pack-note-bad {
+  border-left-color: var(--bad);
+  background: var(--bad-soft);
+}
+.pack-release p,
+.pack-release ul {
+  margin: 0.2rem 0;
+}

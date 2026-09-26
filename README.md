@@ -166,6 +166,7 @@ flowchart LR
 | [모델 선정 리포트](docs/model_selection.md) | KORIE 150장 gemma4 vs qwen3-vl |
 | [RAG vs 파인튜닝 결론](docs/rag_vs_finetuning.md) | 오답 유형 분류와 용어집·예시 실험 |
 | [에이전트 평가](docs/agent_evaluation.md) | 로컬 모델 도구 호출 측정, 자유 루프 vs 워크플로, 도입하지 않은 이유 |
+| [문서 종류 팩 측정 보고서](docs/pack_reports.md) | 배포용 프로그램에 넣는 팩(이력서 조건부 · 영수증)의 합격 기준과 판정 |
 
 ### 빠른 시작
 

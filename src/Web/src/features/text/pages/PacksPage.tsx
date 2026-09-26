@@ -10,6 +10,7 @@ import {
   type PackDetail,
   type PackFieldJson,
   type PackForbiddenJson,
+  type PackRelease,
   type PackMeta,
   type PackTypeJson,
 } from '../api'
@@ -62,6 +63,7 @@ function Layout({ packs, body }: { packs: Pack[]; body: ReactNode }) {
                 <span className="prompt-name muted">{p.id}</span>
                 <span className="prompt-badges">
                   <span className="chip">{p.autoClassified ? '자동 분류' : '직접 선택'}</span>
+                  <ReleaseChip release={p.release} />
                   <span className="chip">필드 {p.fields.length}</span>
                 </span>
               </Link>
@@ -164,6 +166,10 @@ function PackView({ detail }: { detail: PackDetail }) {
         {managed && <span className="chip chip-warn">지시문: 프롬프트 관리 사용</span>}
       </div>
       {managed && <ManagedNote id={type.id} />}
+
+      <h3 className="pack-h">합격 표시 (배포용 프로그램)</h3>
+      <ReleaseView release={type.release ?? null} />
+      <OverrideWarning overrides={detail.promptOverrides} release={type.release ?? null} id={type.id} />
 
       <h3 className="pack-h">필드</h3>
       <FieldTable fields={type.fields} />
@@ -387,13 +393,16 @@ function EditorLoader({ onSaved }: { onSaved: () => void }) {
   if (id && detail) return <PackEditor key={`edit-${id}`} meta={meta} base={detail} create={false} onSaved={onSaved} />
   if (from && detail) {
     // 복사: 필드 · 규칙 · 지시문을 가져오고 id · 이름 · 버전 · 변경 기록은 새로
-    const { changelog: _changelog, ...rest } = structuredClone(detail.type)
+    // 합격 표시는 복사하지 않음 (새 종류는 측정 전)
+    const { changelog: _changelog, release: _release, ...rest } = structuredClone(detail.type)
     void _changelog
+    void _release
     const copy: PackDetail = {
       ...detail,
       type: { ...rest, id: '', display_name: `${detail.type.display_name} 복사본`, version: '0.1.0' },
       managed: false,
       history: [],
+      promptOverrides: [],
     }
     return <PackEditor key={`copy-${from}`} meta={meta} base={copy} create onSaved={onSaved} />
   }
@@ -403,6 +412,7 @@ function EditorLoader({ onSaved }: { onSaved: () => void }) {
     files: { 'prompt.md': NEW_PROMPT },
     managed: false,
     history: [],
+    promptOverrides: [],
   }
   return <PackEditor key="new" meta={meta} base={blank} create onSaved={onSaved} />
 }
@@ -446,6 +456,11 @@ function PackEditor({
       forbidden: type.forbidden.map((f) => (f.pattern?.trim() ? f : { id: f.id, label: f.label })),
     }
     if (!clean.description?.trim()) delete clean.description
+    if (!clean.release) delete clean.release
+    else {
+      const conditions = (clean.release.conditions ?? []).map((c) => c.trim()).filter(Boolean)
+      clean.release = { status: clean.release.status, report: clean.release.report.trim(), ...(conditions.length ? { conditions } : {}) }
+    }
     // 파일 변경: 바뀌거나 새로 생긴 파일 + 지운 파일(null)
     const changes: Record<string, string | null> = {}
     for (const [name, content] of Object.entries(files)) if (base.files[name] !== content) changes[name] = content
@@ -524,6 +539,10 @@ function PackEditor({
           </span>
         </label>
       </div>
+
+      <h3 className="pack-h">합격 표시 (배포용 프로그램)</h3>
+      <ReleaseEditor release={type.release ?? null} onChange={(release) => set('release', release)} />
+      <OverrideWarning overrides={base.promptOverrides} release={type.release ?? null} id={base.type.id} />
 
       <h3 className="pack-h">필드</h3>
       <FieldsEditor fields={type.fields} meta={meta} nested={false} onChange={(fields) => set('fields', fields)} />
@@ -895,5 +914,112 @@ function ForbiddenEditor({ items, onChange }: { items: PackForbiddenJson[]; onCh
         <span className="small muted">패턴이 추출 결과에 있으면 오류, 원문에만 있으면 가림 경고.</span>
       </div>
     </>
+  )
+}
+
+/* ───────────── 합격 표시 ───────────── */
+
+const REPO_URL = 'https://github.com/calm-sea-psy/llm-playground-classifier/blob/main/'
+const RELEASE_LABEL = { passed: '합격', conditional: '조건부 합격' } as const
+
+function ReleaseChip({ release }: { release: PackRelease | null }) {
+  if (!release) return <span className="chip">평가만</span>
+  return <span className={`chip ${release.status === 'passed' ? 'chip-ok' : 'chip-warn'}`}>{RELEASE_LABEL[release.status]}</span>
+}
+
+function ReleaseView({ release }: { release: PackRelease | null }) {
+  if (!release)
+    return (
+      <p className="small muted">
+        합격 표시가 없습니다. 평가 도구에서만 쓰고 배포용 프로그램(exe)에는 넣지 않습니다. 측정해서 기준을 넘으면 고치기에서
+        표시하세요.
+      </p>
+    )
+  return (
+    <div className="small pack-release">
+      <p>
+        <ReleaseChip release={release} /> 배포용 프로그램(exe)에 들어갑니다 · 측정 보고서{' '}
+        <a href={REPO_URL + release.report} target="_blank" rel="noreferrer">
+          <code>{release.report}</code>
+        </a>
+      </p>
+      {(release.conditions?.length ?? 0) > 0 && (
+        <>
+          <strong>조건</strong>
+          <ul>
+            {release.conditions!.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
+/** 합격 표시한 팩인데 프롬프트 관리의 DB 버전이 적용 중이면: 문서 처리(측정)와 exe(팩 파일)가 다른 문장을 씀 */
+function OverrideWarning({
+  overrides,
+  release,
+  id,
+}: {
+  overrides: { name: string; version: number }[]
+  release: PackRelease | null
+  id: string
+}) {
+  if (overrides.length === 0) return null
+  return (
+    <p className={`small pack-note ${release ? 'pack-note-bad' : ''}`}>
+      프롬프트 관리에서 고친 버전이 적용 중입니다:{' '}
+      {overrides.map((o, i) => (
+        <span key={o.name}>
+          {i > 0 && ', '}
+          <Link to={`/prompts/text/${o.name}`}>
+            {o.name} v{o.version}
+          </Link>
+        </span>
+      ))}
+      . 문서 처리 · 모델 비교는 이 문장으로 측정하지만 배포용 프로그램은 팩 파일(packs/{id}/)을 씁니다.
+      {release ? ' 합격 표시를 유지하려면 고친 내용을 팩 파일에 옮기고 다시 측정하거나, 프롬프트를 기본값으로 되돌리세요.' : ''}
+    </p>
+  )
+}
+
+function ReleaseEditor({ release, onChange }: { release: PackRelease | null; onChange: (r: PackRelease | null) => void }) {
+  return (
+    <div className="pack-grid">
+      <label>
+        <span className="small muted">상태</span>
+        <select
+          value={release?.status ?? ''}
+          onChange={(e) => {
+            const status = e.target.value as PackRelease['status'] | ''
+            onChange(status ? { report: 'docs/pack_reports.md#', ...release, status } : null)
+          }}
+        >
+          <option value="">표시 없음 (평가 도구에서만)</option>
+          <option value="passed">합격</option>
+          <option value="conditional">조건부 합격</option>
+        </select>
+      </label>
+      {release && (
+        <>
+          <label className="pack-wide">
+            <span className="small muted">측정 보고서 (저장소 기준 경로)</span>
+            <input value={release.report} onChange={(e) => onChange({ ...release, report: e.target.value })} />
+          </label>
+          <label className="pack-wide">
+            <span className="small muted">
+              조건 (한 줄에 하나{release.status === 'conditional' ? ', 조건부 합격은 하나 이상 필요' : ''})
+            </span>
+            <textarea
+              rows={3}
+              value={(release.conditions ?? []).join('\n')}
+              onChange={(e) => onChange({ ...release, conditions: e.target.value.split('\n') })}
+            />
+          </label>
+        </>
+      )}
+    </div>
   )
 }

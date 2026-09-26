@@ -94,6 +94,16 @@ public sealed class PackStoreTests : IDisposable
     }
 
     [Fact]
+    public void 합격_표시_검사()
+    {
+        var resume = _store.Get("resume")!;
+        Assert.Contains(PackCheck.Check(resume with { Release = new("shipped", "docs/x.md") }), e => e.Contains("release.status"));
+        Assert.Contains(PackCheck.Check(resume with { Release = new(PackRelease.Passed, " ") }), e => e.Contains("release.report"));
+        Assert.Contains(PackCheck.Check(resume with { Release = new(PackRelease.Conditional, "docs/x.md") }), e => e.Contains("조건"));
+        Assert.Empty(PackCheck.Check(resume with { Release = new(PackRelease.Conditional, "docs/x.md", ["검수 필수"]) }));
+    }
+
+    [Fact]
     public void 새_팩_추가()
     {
         var type = new JsonObject

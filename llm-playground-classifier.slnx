@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Api/Api.csproj" />
+    <Project Path="src/Digitizer.App/Digitizer.App.csproj" />
     <Project Path="src/Digitizer.Engine/Digitizer.Engine.csproj" />
     <Project Path="src/Monitor/Monitor.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Api.Tests/Api.Tests.csproj" />
+    <Project Path="tests/Digitizer.App.Tests/Digitizer.App.Tests.csproj" />
   </Folder>
 </Solution>
