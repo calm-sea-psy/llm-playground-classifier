@@ -9,11 +9,15 @@ using Api.Shared.Imaging;
 using Api.Shared.Jobs;
 using Api.Shared.Llm;
 using Api.Shared.Storage;
+using Digitizer.Engine;
 using Microsoft.Extensions.Options;
 
 namespace Api.Modules.Text;
 
-/// <summary>Step 1 작업 처리: OCR ➔ ClassifyDocument ➔ ExtractFields ➔ ValidateFields ➔ (VLM 폴백 ➔ 재검증) ➔ SaveResult</summary>
+/// <summary>
+/// Step 1 작업 처리: 원문 (이미지 OCR · PDF · DOCX) ➔ ClassifyDocument (문서 종류를 지정하면 생략) ➔ ExtractFields (팩 + Engine)
+/// ➔ ValidateFields ➔ (VLM 폴백 ➔ 재검증, 원본이 이미지일 때만) ➔ SaveResult
+/// </summary>
 public sealed class TextJobHandler(
     IOcrEngine ocr,
     TextPipeline pipeline,
@@ -22,29 +26,60 @@ public sealed class TextJobHandler(
     UploadStorage storage,
     IOptions<PipelineOptions> pipelineOptions,
     SettingsStore settingsStore,
+    PackStore packs,
+    IHttpClientFactory httpFactory,
     TimeProvider clock)
     : IJobHandler
 {
+    /// <summary>Engine 이 스캔 PDF 를 OCR 할 때 쓰는 HttpClient 이름 (TextModule 에서 등록)</summary>
+    public const string EngineOcrClient = "digitizer-engine-ocr";
+
     public async Task<string> HandleAsync(Job job, JobReporter reporter, CancellationToken ct)
     {
         // 작업에 저장된 설정 조합 (모델 비교 실험), 없으면 DB 의 문서 처리 기본 설정
         var settings = PipelineSettings.FromJson(job.Settings) ?? (await settingsStore.GetDefaultAsync(ct)).Settings;
-        var ocrResult = await RunOcrAsync(job, settings, reporter, ct);
-        // 경로 B(문서 파싱 엔진)는 표 구조가 보존된 Markdown, 경로 A 는 줄 좌표로 만든 읽기 순서 텍스트
-        var structured = !string.IsNullOrWhiteSpace(ocrResult.Markdown);
-        var readingText = structured ? ocrResult.Markdown! : ReadingOrder.Build(ocrResult);
-        var document = new DocumentText(readingText, structured);
+        // PDF · DOCX 는 이미지가 없어 VLM 폴백 · 이미지 분류를 하지 않음
+        var isDocument = JobFactory.IsDocument(job.FileName);
+        DocumentText document;
+        double? ocrConfidence;
+        if (isDocument)
+        {
+            await reporter.SetStatusAsync(job, JobStatus.OcrRunning, "원문 추출 중 (PDF 텍스트 층 · DOCX, 스캔 PDF 는 OCR)", ct);
+            var extractor = new TextExtractor(new OcrClient(httpFactory.CreateClient(EngineOcrClient), settings.OcrEngine));
+            var source = await extractor.ExtractAsync(storage.PathOf(job.Id, job.StoredFileName), ct);
+            await storage.WriteTextAsync(job.Id, "source.txt", source.Text, ct);
+            document = new DocumentText(source.Text, Structured: false, FieldExtractor.InputLabel(source.Source));
+            ocrConfidence = source.OcrConfidence;
+        }
+        else
+        {
+            var ocrResult = await RunOcrAsync(job, settings, reporter, ct);
+            // 경로 B(문서 파싱 엔진)는 표 구조가 보존된 Markdown, 경로 A 는 줄 좌표로 만든 읽기 순서 텍스트
+            var structured = !string.IsNullOrWhiteSpace(ocrResult.Markdown);
+            document = new DocumentText(structured ? ocrResult.Markdown! : ReadingOrder.Build(ocrResult), structured);
+            ocrConfidence = ocrResult.AvgConfidence;
+        }
+        var readingText = document.Text;
         var model = settings.Model;
         var options = pipelineOptions.Value;
         LlmImage? vlmImage = null;
         LlmImage VlmImage() => vlmImage ??= LoadVlmImage(job, options.VlmMaxImageSide);
 
-        // 1) ClassifyDocument (OCR 텍스트가 없으면 이미지로 분류)
-        await reporter.SetStatusAsync(job, JobStatus.LlmRunning, $"LLM 구조화 중: 문서 분류 ({model})", ct);
-        var classification = await pipeline.ClassifyDocumentAsync(
-            model, document, readingText.Length == 0 ? VlmImage() : null, ct);
+        // 1) ClassifyDocument (문서 종류를 지정했으면 생략, OCR 텍스트가 없으면 이미지로 분류)
+        Classification classification;
+        if (settings.DocumentType is { } chosen)
+        {
+            classification = new Classification(chosen, 0, "사용자 지정", null);
+        }
+        else
+        {
+            await reporter.SetStatusAsync(job, JobStatus.LlmRunning, $"LLM 구조화 중: 문서 분류 ({model})", ct);
+            classification = await pipeline.ClassifyDocumentAsync(
+                model, document, readingText.Length == 0 && !isDocument ? VlmImage() : null, ct);
+        }
         var documentType = classification.DocumentType;
-        if (!DocumentTypes.Extractable.Contains(documentType))
+        // 추출 가능 = 문서 종류 팩이 있음 (이력서처럼 자동 분류 대상이 아닌 종류도 지정하면 처리)
+        if (packs.Get(documentType) is not { } pack)
         {
             await SaveResultAsync(job, model, classification, readingText, final: null, attempts: [], fallbackReason: null, ct);
             return $"완료: 지원하지 않는 문서 종류 ({documentType})";
@@ -56,7 +91,7 @@ public sealed class TextJobHandler(
         if (readingText.Length > 0)
         {
             await reporter.SetStatusAsync(job, JobStatus.LlmRunning,
-                $"LLM 구조화 중: 필드 추출 ({DocumentTypes.DisplayName(documentType)}, {model})", ct);
+                $"LLM 구조화 중: 필드 추출 ({pack.DisplayName}, {model})", ct);
             textAttempt = await pipeline.ExtractFieldsAsync(model, documentType, document, null, null, ct);
             attempts.Add(textAttempt);
             await reporter.SetStatusAsync(job, JobStatus.Validating, $"검증: {Summary(textAttempt)}", ct);
@@ -72,11 +107,13 @@ public sealed class TextJobHandler(
         {
             reasons.Add($"검증 오류 {textAttempt.ErrorCount}건");
         }
-        if (ocrResult.AvgConfidence is { } confidence && confidence < settings.FallbackConfidence)
+        if (ocrConfidence is { } confidence && confidence < settings.FallbackConfidence)
         {
             reasons.Add($"OCR 평균 신뢰도 {confidence:0.00} < {settings.FallbackConfidence:0.00}");
         }
-        string? fallbackReason = settings.VlmFallback && reasons.Count > 0 ? string.Join(", ", reasons) : null;
+        // VLM 폴백: 원본이 이미지이고 팩에 이미지 폴백 틀(vlm.user.md)이 있을 때만 (이력서 팩은 폴백 없이 측정)
+        string? fallbackReason = settings.VlmFallback && !isDocument && pack.VlmUserTemplate is not null && reasons.Count > 0
+            ? string.Join(", ", reasons) : null;
         if (fallbackReason is not null)
         {
             await reporter.SetStatusAsync(job, JobStatus.LlmRunning, $"VLM 폴백 추출 중 ({fallbackReason})", ct);
@@ -86,12 +123,19 @@ public sealed class TextJobHandler(
             await reporter.SetStatusAsync(job, JobStatus.Validating, $"재검증: {Summary(vlmAttempt)}", ct);
         }
 
+        // 원문이 비었고 이미지도 없어(PDF · DOCX) 폴백할 수 없으면 추출 없이 끝냄
+        if (attempts.Count == 0)
+        {
+            await SaveResultAsync(job, model, classification, readingText, final: null, attempts: [], fallbackReason: null, ct);
+            return $"완료: 원문 텍스트가 없어 필드를 추출하지 못했습니다 ({pack.DisplayName})";
+        }
+
         // 5) SaveResult
         var final = ChooseFinal(textAttempt, attempts.FirstOrDefault(a => a.Source == ExtractionAttempt.Vlm));
         await SaveResultAsync(job, model, classification, readingText, final, attempts, fallbackReason, ct);
 
         var llmMs = classification.ElapsedMs + attempts.Sum(a => a.ElapsedMs);
-        return $"검증/저장 완료: {DocumentTypes.DisplayName(documentType)}, "
+        return $"검증/저장 완료: {pack.DisplayName}, "
             + (final.ErrorCount == 0 ? "검증 통과" : $"검증 실패(오류 {final.ErrorCount}건)")
             + (fallbackReason is null ? "" : $", VLM 폴백{(final.Source == ExtractionAttempt.Vlm ? " 결과 사용" : " 후 텍스트 결과 유지")}")
             + $", LLM {llmMs / 1000.0:0.0}초";

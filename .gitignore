@@ -34,3 +34,6 @@ data/digitizer/
 # 평가 결과 (KORIE 라벨 파생 데이터 포함 ➔ 요약은 docs/model_selection.md 로)
 eval/results/
 eval/**/*.log
+
+# 팩 관리 화면이 고치기 전 버전을 남기는 폴더 (이력은 git 으로 관리)
+packs/*/.history/

@@ -41,7 +41,7 @@ function JobDetail({ jobId }: { jobId: string }) {
       <JobProgress job={job} timeline={timeline} model={textProgress} />
 
       {job.status === 'Failed' && job.error && <section className="card text-bad">실패 사유: {job.error}</section>}
-      {job.status === 'Completed' && <ResultView jobId={job.jobId} />}
+      {job.status === 'Completed' && <ResultView jobId={job.jobId} fileName={job.fileName} />}
     </>
   )
 }

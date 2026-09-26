@@ -39,6 +39,8 @@ public sealed partial record DocumentType(
     /// <summary>false 면 필드 타입에서 나오는 공통 검사(원문 근거 · 형식)를 끄고 rules 에 적은 규칙만 씀 (기존 영수증 동작과 같게)</summary>
     [JsonPropertyName("generic_checks")] public bool GenericChecks { get; init; } = true;
 
+    [JsonPropertyName("description")] public string? Description { get; init; }
+
     /// <summary>프롬프트 틀의 {{$이름}} 에 넣을 값 (예: 영수증 amount_rule)</summary>
     [JsonPropertyName("variables")] public Dictionary<string, string> Variables { get; init; } = [];
 

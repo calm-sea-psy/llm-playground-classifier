@@ -58,7 +58,7 @@ public static class ExperimentEndpoints
             {
                 return Results.Problem($"조합은 1~{MaxCombos}개여야 합니다", statusCode: StatusCodes.Status400BadRequest);
             }
-            if (files.Select(factory.Validate).FirstOrDefault(e => e is not null) is { } fileError)
+            if (files.Select(f => factory.Validate(f, allowDocuments: true)).FirstOrDefault(e => e is not null) is { } fileError)
             {
                 return Results.Problem(fileError, statusCode: StatusCodes.Status400BadRequest);
             }

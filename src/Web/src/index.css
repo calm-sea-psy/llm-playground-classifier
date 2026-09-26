@@ -410,6 +410,18 @@ table.jobs {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* PDF · DOCX: 원문 텍스트 / 추출 결과 2단 */
+.result-grid.result-grid-2 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+}
+.result-grid.result-grid-2 > :last-child {
+  grid-column: auto;
+}
+@media (max-width: 760px) {
+  .result-grid.result-grid-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .panel {
   display: flex;
   flex-direction: column;
@@ -1482,4 +1494,150 @@ table.jobs {
 .finding-bars li.borderline .fill {
   background: var(--warn);
   opacity: 0.6;
+}
+
+/* 문서 처리: 문서 종류 선택 */
+.doc-type {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin: 0.75rem 0;
+}
+.doc-type > span:first-child {
+  font-weight: 600;
+}
+
+/* 문서 종류 (팩) 관리 */
+.pack-new {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--accent);
+}
+.primary-link {
+  text-decoration: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: #fff;
+}
+.prompt-actions a.small-button:not(.primary-link) {
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: inherit;
+}
+.pack-h {
+  margin: 0.6rem 0 0;
+  font-size: 0.95rem;
+}
+.pack-note {
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--warn);
+  background: var(--warn-soft);
+  border-radius: 6px;
+}
+.pack-rules,
+.pack-rule-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+.pack-rule-list {
+  list-style: none;
+  padding-left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.pack-fields td,
+.pack-edit-table td {
+  vertical-align: top;
+}
+.pack-item-row td:first-child code {
+  padding-left: 1rem;
+}
+.pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.6rem;
+}
+.pack-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.pack-grid .pack-wide {
+  grid-column: 1 / -1;
+}
+.pack-grid label.pack-check,
+label.pack-check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.4rem;
+  display: flex;
+}
+.pack-version {
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pack-version input {
+  width: 6rem;
+}
+.pack-editor input:not([type='checkbox']),
+.pack-editor select {
+  padding: 0.3rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  min-width: 0;
+}
+.pack-edit-table {
+  width: 100%;
+}
+.pack-edit-table input:not([type='checkbox']) {
+  width: 100%;
+}
+.pack-edit-table td:first-child,
+.pack-edit-table td:nth-child(2) {
+  min-width: 8rem;
+}
+.pack-grow {
+  width: 40%;
+}
+.pack-center {
+  text-align: center;
+}
+.pack-code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.82rem;
+}
+.pack-items {
+  margin: 0.3rem 0 0.4rem 1rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--border);
+}
+.pack-list-opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+.pack-family {
+  width: 13rem;
+}
+.pack-save {
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.pack-errors {
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.5rem 1.6rem;
+  background: var(--bad-soft);
+  border-radius: 6px;
 }

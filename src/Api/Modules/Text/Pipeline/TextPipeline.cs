@@ -23,12 +23,15 @@ public sealed class PipelineOptions
     public string PacksRoot { get; set; } = "../../packs";
 }
 
-/// <summary>LLM 에 넣을 문서 텍스트. Structured = 문서 파싱 엔진의 Markdown(표는 HTML), 아니면 OCR 줄 읽기 순서 텍스트</summary>
-public sealed record DocumentText(string Text, bool Structured)
+/// <summary>
+/// LLM 에 넣을 문서 텍스트. Structured = 문서 파싱 엔진의 Markdown(표는 HTML), 아니면 OCR 줄 읽기 순서 텍스트.
+/// SourceLabel = PDF 텍스트 층 · DOCX 처럼 OCR 이 아닌 원문일 때의 안내 (FieldExtractor.InputLabel)
+/// </summary>
+public sealed record DocumentText(string Text, bool Structured, string? SourceLabel = null)
 {
-    public string Label => Structured
+    public string Label => SourceLabel ?? (Structured
         ? "문서 파싱 결과 (Markdown, 표는 HTML 로 칸 구조 유지)"
-        : "OCR 텍스트 (위➔아래, 같은 줄은 왼쪽➔오른쪽 순서)";
+        : "OCR 텍스트 (위➔아래, 같은 줄은 왼쪽➔오른쪽 순서)");
 }
 
 public sealed record Classification(string DocumentType, int ElapsedMs, string Raw, string? ParseError);
@@ -123,20 +126,37 @@ public sealed class TextPipeline(
     {
         var pack = packs.Get(documentType)
             ?? throw new InvalidOperationException($"문서 종류 팩이 없습니다: {Path.Combine(packs.Root, documentType)}");
-        var system = await prompts.RenderForModelAsync($"extract.{documentType}", model,
-            new(pack.Variables.ToDictionary(v => v.Key, v => (object?)v.Value)), ct);
-        var user = await prompts.RenderAsync(image is null ? "extract.user" : "extract.vlm.user", new()
+        // 규칙을 "맞추라"고 하면 모델이 값을 계산해 바꿔 버림 (7×1,980=13,860 을 만들어 냄) ➔ 이미지 확인만 요청
+        var issueHint = previousIssues is { Count: > 0 }
+            ? "OCR 텍스트로 먼저 추출한 결과를 규칙으로 검사했더니 아래 항목이 맞지 않았습니다. " +
+              "OCR 오인식일 수 있으니 해당 값들을 이미지에서 직접 확인해 인쇄된 그대로 옮기세요. " +
+              "규칙을 맞추려고 값을 계산하거나 바꾸지 마세요. 이미지와 같다면 그대로 둡니다.\n" +
+              string.Join("\n", previousIssues.Where(i => i.Severity == IssueSeverity.Error).Select(i => $"- {i.Message}"))
+            : "";
+
+        // 지시문 · 메시지: 프롬프트 저장소에 있는 종류(영수증 · 상업송장 · 보험 청구서)는 저장소에서 (화면에서 고친 버전 적용),
+        // 없는 종류(이력서 등 새 팩)는 팩 파일 그대로 (측정한 문장 = 쓰는 문장)
+        var managed = prompts.Has($"extract.{documentType}");
+        var system = managed
+            ? await prompts.RenderForModelAsync($"extract.{documentType}", model,
+                new(pack.Variables.ToDictionary(v => v.Key, v => (object?)v.Value)), ct)
+            : pack.SystemPromptFor(model);
+        string user;
+        if (image is null)
         {
-            ["ocr_text"] = document.Text,
-            ["input_label"] = document.Label,
-            // 규칙을 "맞추라"고 하면 모델이 값을 계산해 바꿔 버림 (7×1,980=13,860 을 만들어 냄) ➔ 이미지 확인만 요청
-            ["issues"] = previousIssues is { Count: > 0 }
-                ? "OCR 텍스트로 먼저 추출한 결과를 규칙으로 검사했더니 아래 항목이 맞지 않았습니다. " +
-                  "OCR 오인식일 수 있으니 해당 값들을 이미지에서 직접 확인해 인쇄된 그대로 옮기세요. " +
-                  "규칙을 맞추려고 값을 계산하거나 바꾸지 마세요. 이미지와 같다면 그대로 둡니다.\n" +
-                  string.Join("\n", previousIssues.Where(i => i.Severity == IssueSeverity.Error).Select(i => $"- {i.Message}"))
-                : "",
-        }, ct);
+            user = managed && pack.UserTemplate is not null
+                ? await prompts.RenderAsync("extract.user", new() { ["ocr_text"] = document.Text, ["input_label"] = document.Label }, ct)
+                : pack.UserMessage(document.Label, document.Text);
+        }
+        else
+        {
+            var template = pack.VlmUserTemplate
+                ?? throw new InvalidOperationException($"{pack.Id} 팩에 이미지 폴백 틀(vlm.user.md)이 없습니다");
+            var values = new Dictionary<string, string> { ["ocr_text"] = document.Text, ["input_label"] = document.Label, ["issues"] = issueHint };
+            user = managed
+                ? await prompts.RenderAsync("extract.vlm.user", new(values.ToDictionary(v => v.Key, v => (object?)v.Value)), ct)
+                : DocumentType.Render(template, values);
+        }
 
         var o = llmOptions.Value;
         var extractor = new FieldExtractor(httpFactory.CreateClient(EngineHttpClient),

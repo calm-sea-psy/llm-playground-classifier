@@ -15,16 +15,24 @@ public sealed class JobFactory(
     TimeProvider clock)
 {
     public static readonly HashSet<string> AllowedExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"];
+    /// <summary>문서 파일 (문서 텍스트 추출만: 텍스트 층 · DOCX 를 Digitizer.Engine 으로 읽고, 스캔 PDF 는 OCR)</summary>
+    public static readonly HashSet<string> DocumentExtensions = [".pdf", ".docx"];
+
+    public static bool IsDocument(string fileName) => DocumentExtensions.Contains(Path.GetExtension(fileName).ToLowerInvariant());
 
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
     /// <summary>문제가 있으면 사유, 없으면 null</summary>
-    public string? Validate(IFormFile file)
+    public string? Validate(IFormFile file) => Validate(file, allowDocuments: false);
+
+    /// <param name="allowDocuments">PDF · DOCX 도 받음 (문서 텍스트 추출)</param>
+    public string? Validate(IFormFile file, bool allowDocuments)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(extension))
+        var allowed = allowDocuments ? [.. AllowedExtensions, .. DocumentExtensions] : AllowedExtensions.ToArray();
+        if (!allowed.Contains(extension))
         {
-            return $"지원하지 않는 형식입니다: {file.FileName} (지원: {string.Join(", ", AllowedExtensions)})";
+            return $"지원하지 않는 형식입니다: {file.FileName} (지원: {string.Join(", ", allowed)})";
         }
         var maxMb = storageOptions.Value.MaxUploadMb;
         return file.Length == 0 || file.Length > maxMb * 1024L * 1024L

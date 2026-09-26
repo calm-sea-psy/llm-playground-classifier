@@ -4,9 +4,11 @@ import { listJobs } from '../../../shared/api/jobs'
 import { isFinished, type JobDto } from '../../../shared/api/types'
 import { StatusBadge } from '../../../shared/components/StatusBadge'
 import { UploadDropzone } from '../../../shared/components/UploadDropzone'
-import { createTextJob, getSettings, type SettingsDto } from '../api'
+import { createTextJob, getPacks, getSettings, type Pack, type SettingsDto } from '../api'
 
-const ACCEPT = '.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp'
+// 이미지는 OCR, PDF · DOCX 는 원문을 바로 읽음 (스캔 PDF 는 OCR)
+const ACCEPT = '.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp,.pdf,.docx'
+const AUTO = ''
 const REFRESH_MS = 3000
 
 /** 업로드 + 최근 작업 목록 */
@@ -17,12 +19,20 @@ export function TextHomePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<JobDto[]>([])
+  const [packs, setPacks] = useState<Pack[]>([])
+  const [documentType, setDocumentType] = useState(AUTO)
 
   useEffect(() => {
     getSettings()
       .then(setSettings)
       .catch(() => setSettings(null))
+    getPacks()
+      .then(setPacks)
+      .catch(() => setPacks([]))
   }, [])
+
+  const autoNames = packs.filter((p) => p.autoClassified).map((p) => p.displayName)
+  const chosen = packs.find((p) => p.id === documentType)
 
   // 진행 중인 작업이 있으면 목록을 주기적으로 갱신
   const hasRunning = jobs.some((j) => !isFinished(j.status))
@@ -40,7 +50,7 @@ export function TextHomePage() {
     setSubmitting(true)
     setError(null)
     try {
-      const job = await createTextJob(file)
+      const job = await createTextJob(file, undefined, documentType || undefined)
       navigate(`/text/jobs/${job.jobId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -53,8 +63,26 @@ export function TextHomePage() {
       <form className="card upload-card" onSubmit={submit}>
         <div>
           <h2>문서 업로드</h2>
-          <p className="muted small">OCR(PaddleOCR) ➔ 문서 분류 ➔ 필드 추출(LLM) ➔ 규칙 검증 ➔ 필요하면 VLM 폴백</p>
+          <p className="muted small">
+            원문(이미지는 OCR, PDF · DOCX 는 그대로) ➔ 문서 분류 ➔ 필드 추출(LLM, 문서 종류 팩) ➔ 규칙 검증 ➔ 필요하면 VLM 폴백
+          </p>
         </div>
+        <label className="doc-type">
+          <span>문서 종류</span>
+          <select value={documentType} onChange={(e) => setDocumentType(e.target.value)} disabled={submitting}>
+            <option value={AUTO}>자동 분류{autoNames.length ? ` (${autoNames.join(' · ')})` : ''}</option>
+            {packs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.displayName}
+              </option>
+            ))}
+          </select>
+          <span className="muted small">
+            {chosen
+              ? `${chosen.displayName} 팩 v${chosen.version} 으로 바로 추출 (분류 생략)${chosen.autoClassified ? '' : ' · 자동 분류 대상이 아니라 직접 골라야 하는 종류'}`
+              : 'LLM 이 문서 종류를 고름. 목록에 없는 종류(예: 이력서)는 직접 선택'}
+          </span>
+        </label>
         <UploadDropzone accept={ACCEPT} file={file} onFile={setFile} disabled={submitting} />
         <div className="upload-actions">
           <span className="small" title={settings?.note ?? undefined}>

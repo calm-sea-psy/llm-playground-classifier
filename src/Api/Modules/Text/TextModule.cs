@@ -32,6 +32,13 @@ public sealed class TextModule : IPipelineModule
             http.BaseAddress = new Uri(ocr.BaseUrl.TrimEnd('/') + "/");
             http.Timeout = TimeSpan.FromSeconds(ocr.TimeoutSeconds);
         });
+        // Digitizer.Engine 이 스캔 PDF 페이지 이미지를 OCR 할 때 (같은 OCR 서비스)
+        services.AddHttpClient(TextJobHandler.EngineOcrClient, (sp, http) =>
+        {
+            var ocr = sp.GetRequiredService<IOptions<OcrOptions>>().Value;
+            http.BaseAddress = new Uri(ocr.BaseUrl.TrimEnd('/') + "/");
+            http.Timeout = TimeSpan.FromSeconds(ocr.TimeoutSeconds);
+        });
         services.Configure<PipelineOptions>(configuration.GetSection("Pipeline"));
         services.Configure<EvalOptions>(configuration.GetSection("Eval"));
         services.AddScoped<TextPrompts>();
@@ -58,17 +65,19 @@ public sealed class TextModule : IPipelineModule
 
     public void MapEndpoints(RouteGroupBuilder group)
     {
-        // 문서 업로드 ➔ 202 + jobId. 설정은 DB 의 문서 처리 기본값 (model 만 바꿔 보낼 수 있음)
+        // 문서 업로드 ➔ 202 + jobId. 설정은 DB 의 문서 처리 기본값 (model · documentType 만 바꿔 보낼 수 있음)
+        // 이미지 외에 PDF · DOCX 도 받음. documentType 을 주면 분류를 건너뛰고 그 팩으로 추출 (이력서처럼 자동 분류 대상이 아닌 종류)
         // 진행 상황은 SignalR(/hubs/jobs) 또는 GET /api/jobs/{id}
         group.MapPost("/jobs", async (
             IFormFile file,
             [FromForm] string? model,
+            [FromForm] string? documentType,
             SettingsStore settingsStore,
             JobFactory factory,
             AppDbContext db,
             CancellationToken ct) =>
         {
-            if (factory.Validate(file) is { } fileError)
+            if (factory.Validate(file, allowDocuments: true) is { } fileError)
             {
                 return Results.Problem(fileError, statusCode: StatusCodes.Status400BadRequest);
             }
@@ -76,6 +85,10 @@ public sealed class TextModule : IPipelineModule
             if (!string.IsNullOrEmpty(model))
             {
                 settings = settings with { Model = model };
+            }
+            if (!string.IsNullOrEmpty(documentType) && documentType != "auto")
+            {
+                settings = settings with { DocumentType = documentType };
             }
             if (settingsStore.Validate(settings) is { } settingsError)
             {
@@ -91,6 +104,10 @@ public sealed class TextModule : IPipelineModule
             }
             return Results.Accepted($"/api/jobs/{job.Id}", JobDto.From(job));
         }).DisableAntiforgery();
+
+        // 문서 종류 팩 목록 (문서 처리의 종류 선택 · 결과 화면의 칸 이름 · 문서 종류 화면)
+        group.MapGet("/packs", (PackStore packs) => packs.All().Select(PackDto.From));
+        PackEndpoints.Map(group.MapGroup("/packs"));
 
         // OCR 결과 원본 (OcrService 응답과 같은 형식)
         group.MapGet("/jobs/{id:guid}/ocr", async (Guid id, AppDbContext db, CancellationToken ct) =>

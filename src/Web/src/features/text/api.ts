@@ -67,12 +67,109 @@ export interface ModelList {
   models: string[]
 }
 
-export const createTextJob = (file: File, model?: string) => {
+/** documentType: 문서 종류 팩 id. 없으면 LLM 이 분류 (영수증 · 상업송장 · 보험 청구서만) */
+export const createTextJob = (file: File, model?: string, documentType?: string) => {
   const form = new FormData()
   form.append('file', file)
   if (model) form.append('model', model)
+  if (documentType) form.append('documentType', documentType)
   return postForm<JobDto>('/api/text/jobs', form)
 }
+
+/** 문서 종류 팩의 필드 (packs/{종류}/type.json). type: text · date · month · amount · number · list … */
+export interface PackField {
+  name: string
+  label: string
+  type: string
+  required: boolean
+  key: string | null
+  items: PackField[] | null
+  description: string | null
+}
+
+export interface Pack {
+  id: string
+  version: string
+  displayName: string
+  description: string | null
+  /** LLM 분류로 찾는 종류 (아니면 문서 처리에서 골라야 함) */
+  autoClassified: boolean
+  fields: PackField[]
+  rules: string[]
+  genericChecks: boolean
+  forbidden: string[]
+}
+
+let packsCache: Promise<Pack[]> | null = null
+/** 팩 목록 (화면 전체에서 한 번만 불러옴) */
+export const getPacks = () => (packsCache ??= getJson<Pack[]>('/api/text/packs').catch((e) => ((packsCache = null), Promise.reject(e))))
+
+/** type.json 원본의 필드 (snake_case 그대로, 화면에 없는 키도 보존) */
+export interface PackFieldJson {
+  name: string
+  label: string
+  type: string
+  required?: boolean
+  key?: string | null
+  ranged?: boolean
+  items?: PackFieldJson[] | null
+  description?: string | null
+  [extra: string]: unknown
+}
+
+export interface PackForbiddenJson {
+  id: string
+  label: string
+  pattern?: string | null
+}
+
+/** packs/{종류}/type.json 원본 (excel · notes · changelog 등 화면에서 안 고치는 키도 그대로 저장) */
+export interface PackTypeJson {
+  id: string
+  version: string
+  display_name: string
+  description?: string | null
+  generic_checks?: boolean
+  variables?: Record<string, string>
+  fields: PackFieldJson[]
+  forbidden: PackForbiddenJson[]
+  rules: string[]
+  changelog?: { version: string; date: string; changes: string }[]
+  [extra: string]: unknown
+}
+
+export interface PackDetail {
+  summary: Pack
+  type: PackTypeJson
+  /** 프롬프트 파일 (prompt.md · prompt.{모델 계열}.md · user.md · vlm.user.md) */
+  files: Record<string, string>
+  /** 프롬프트 관리에 등록된 종류: 문서 처리는 지시문을 프롬프트 관리의 적용 버전으로 씀 */
+  managed: boolean
+  /** 고치기 전 버전 보관 (packs/{종류}/.history) */
+  history: { version: string; savedAt: string }[]
+}
+
+export interface PackMeta {
+  fieldTypes: { type: string; description: string }[]
+  rules: { name: string; kind: 'fixer' | 'check' | 'generic'; description: string | null }[]
+}
+
+export const getPack = (id: string) => getJson<PackDetail>(`/api/text/packs/${id}`)
+export const getPackMeta = () => getJson<PackMeta>('/api/text/packs/meta')
+
+/** 저장 (create = 새 종류). files 의 값이 null 이면 그 파일 삭제. 실패하면 문제가 한 줄에 하나씩 든 메시지 */
+export async function savePack(type: PackTypeJson, files: Record<string, string | null>, note: string, create: boolean) {
+  const saved = await sendJson<Pack>(create ? '/api/text/packs' : `/api/text/packs/${type.id}`, create ? 'POST' : 'PUT', {
+    type,
+    files,
+    note,
+  })
+  packsCache = null
+  return saved
+}
+
+/** 팩을 고친 뒤 목록 다시 읽기 */
+export const reloadPacks = () => ((packsCache = null), getPacks())
 
 export const getModels = () => getJson<ModelList>('/api/text/models')
 export const getOcr = (jobId: string) => getJson<OcrResult>(`/api/text/jobs/${jobId}/ocr`)

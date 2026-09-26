@@ -26,7 +26,9 @@ public sealed record PipelineSettings(
     double FallbackConfidence,
     /// <summary>검증 오류·저신뢰 시 이미지로 다시 추출할지</summary>
     /// <remarks>예전 스냅숏의 amountsAsString · extraction 은 4차 통합에서 없앤 옵션이라 읽을 때 무시됨</remarks>
-    bool VlmFallback)
+    bool VlmFallback,
+    /// <summary>문서 종류 팩 id (예: resume). null 이면 LLM 이 분류 (영수증 · 상업송장 · 보험 청구서만 자동 분류)</summary>
+    string? DocumentType = null)
 {
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {
@@ -42,7 +44,8 @@ public sealed record PipelineSettings(
     [JsonIgnore]
     public string Summary =>
         $"{Model} · {(OcrEngine == "ppstructure" ? "경로 B" : "경로 A")} · LLM 내리기 {UnloadBeforeOcr}"
-        + $" · 폴백 {(VlmFallback ? $"<{FallbackConfidence:0.00}" : "끔")}";
+        + $" · 폴백 {(VlmFallback ? $"<{FallbackConfidence:0.00}" : "끔")}"
+        + (DocumentType is null ? "" : $" · 문서 종류 {DocumentType}");
 }
 
 public sealed record SettingsDto(PipelineSettings Settings, string Summary, string? Note, DateTimeOffset UpdatedAt);
@@ -59,6 +62,7 @@ public sealed class SettingsStore(
     IOptions<LlmOptions> llmOptions,
     IOptions<OcrOptions> ocrOptions,
     IOptions<Pipeline.PipelineOptions> pipelineOptions,
+    PackStore packs,
     TimeProvider clock)
 {
     public SettingsOptionsDto Options() => new(llm.Models, Engines, Enum.GetNames<UnloadPolicy>());
@@ -111,6 +115,10 @@ public sealed class SettingsStore(
         if (s.FallbackConfidence is < 0 or > 1)
         {
             return "폴백 신뢰도 기준은 0~1 사이여야 합니다";
+        }
+        if (s.DocumentType is { } type && packs.Get(type) is null)
+        {
+            return $"문서 종류 팩이 없습니다: {type} (packs/{type})";
         }
         return null;
     }

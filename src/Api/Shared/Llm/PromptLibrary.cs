@@ -16,6 +16,9 @@ public abstract class PromptLibrary(Kernel kernel, PromptStore store, PromptUsag
     private static readonly ConcurrentDictionary<string, IPromptTemplate> Cache = new();
     private static readonly KernelPromptTemplateFactory Factory = new();
 
+    /// <summary>프롬프트 저장소(파일 또는 화면에서 저장한 버전)에 있는지</summary>
+    public bool Has(string name) => store.Exists(module, name);
+
     public Task<string> RenderAsync(string name, KernelArguments? arguments = null, CancellationToken ct = default) =>
         RenderTemplateAsync(name, arguments, ct);
 
