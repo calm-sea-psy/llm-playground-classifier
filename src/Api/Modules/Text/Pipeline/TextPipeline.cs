@@ -166,7 +166,8 @@ public sealed class TextPipeline(LlmClient llm, TextPrompts prompts, IOptions<Pi
             SchemaValid: parseError is null, parseError, fields, issues, response.Content);
     }
 
-    private static string AmountRule(string documentType, bool asString) => (documentType, asString) switch
+    /// <summary>영수증 팩(packs/receipt) 의 amount_rule 변수와 같아야 함 (ReceiptPackTests)</summary>
+    public static string AmountRule(string documentType, bool asString) => (documentType, asString) switch
     {
         (DocumentTypes.CommercialInvoice, false) =>
             "Amounts are plain numbers without thousands separators or currency symbols (e.g. \"1,234.50\" → 1234.50).",

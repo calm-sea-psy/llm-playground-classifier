@@ -17,7 +17,15 @@ public sealed record Extraction(JsonObject? Fields, string Raw, long ElapsedMs, 
 /// </summary>
 public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
 {
-    public async Task<Extraction> ExtractAsync(DocumentType type, string sourceText, CancellationToken ct = default)
+    /// <summary>원문 종류별 안내 문구 (영수증 user.md 의 {{$input_label}}). ocr 은 평가 도구 DocumentText.Label 과 같은 문장</summary>
+    public static string InputLabel(string? source) => source switch
+    {
+        "ocr" => "OCR 텍스트 (위➔아래, 같은 줄은 왼쪽➔오른쪽 순서)",
+        "pdf-text" or "docx" => "문서 텍스트 (PDF · DOCX 에서 추출, 원래 순서)",
+        _ => "문서 텍스트",
+    };
+
+    public async Task<Extraction> ExtractAsync(DocumentType type, string sourceText, string? sourceKind = null, CancellationToken ct = default)
     {
         IChatClient client = new OllamaApiClient(ollamaHttp, options.Model);
         var chat = new ChatOptions
@@ -39,8 +47,8 @@ public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
         {
             var response = await client.GetResponseAsync(
             [
-                new(ChatRole.System, type.Prompt),
-                new(ChatRole.User, $"다음은 {type.DisplayName} 원문입니다.\n\n{sourceText}"),
+                new(ChatRole.System, type.SystemPromptFor(options.Model)),
+                new(ChatRole.User, type.UserMessage(InputLabel(sourceKind), sourceText)),
             ], chat, ct);
             raw = response.Text;
             input += response.Usage?.InputTokenCount ?? 0;
@@ -67,6 +75,9 @@ public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
                 ["items"] = Object(f.Items ?? []),
             },
             "string_list" => new JsonObject { ["type"] = "array", ["description"] = f.Label, ["items"] = new JsonObject { ["type"] = "string" } },
+            // 영수증: 금액은 원 단위 정수, 수량은 소수 가능 (평가 도구 DocumentSchemas 와 같은 타입)
+            "amount" => new JsonObject { ["type"] = new JsonArray("integer", "null"), ["description"] = Describe(f) },
+            "number" => new JsonObject { ["type"] = new JsonArray("number", "null"), ["description"] = Describe(f) },
             _ => new JsonObject { ["type"] = new JsonArray("string", "null"), ["description"] = Describe(f) },
         };
 
@@ -75,6 +86,7 @@ public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
             ["type"] = "object",
             ["properties"] = new JsonObject(fields.Select(f => KeyValuePair.Create(f.Name, (JsonNode?)Field(f)))),
             ["required"] = new JsonArray([.. fields.Select(f => (JsonNode)JsonValue.Create(f.Name)!)]),
+            ["additionalProperties"] = false,
         };
 
         // 팩의 description 을 그대로 싣는다 (v0.1: 시험 이름 · 점수, 대학원 포함 여부가 모호해 모델마다 다르게 옮김)
@@ -83,6 +95,7 @@ public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
             "date" => $"{f.Label} (YYYY-MM-DD)",
             "month" => $"{f.Label} (YYYY-MM)",
             "month_or_present" => $"{f.Label} (YYYY-MM, 재직 중 · 현재면 present)",
+            "time" => $"{f.Label} (HH:MM 또는 HH:MM:SS)",
             _ => f.Label,
         }) + (f.Description is null ? "" : $". {f.Description}");
 

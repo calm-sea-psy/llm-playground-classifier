@@ -1,0 +1,43 @@
+{
+  "id": "receipt",
+  "version": "1.0.0",
+  "display_name": "영수증",
+  "description": "한국 소매점 영수증 (평가 도구 Text 모듈에서 KORIE 150장으로 측정 · 선정된 설정을 팩으로 옮김)",
+  "generic_checks": false,
+  "variables": {
+    "amount_rule": "금액은 원 단위 정수로, 쉼표·'원'·통화 기호를 뺍니다 (예: \"12,850원\" → 12850)."
+  },
+  "fields": [
+    { "name": "store_name", "label": "상호", "type": "text" },
+    { "name": "business_no", "label": "사업자등록번호", "type": "text" },
+    { "name": "date", "label": "거래 날짜", "type": "date" },
+    { "name": "time", "label": "거래 시각", "type": "time" },
+    { "name": "receipt_no", "label": "영수증 번호", "type": "text" },
+    {
+      "name": "items", "label": "품목", "type": "list", "key": "name",
+      "items": [
+        { "name": "name", "label": "품목명", "type": "text" },
+        { "name": "qty", "label": "수량", "type": "number" },
+        { "name": "unit_price", "label": "단가", "type": "amount" },
+        { "name": "amount", "label": "금액", "type": "amount" }
+      ]
+    },
+    { "name": "subtotal", "label": "공급가액", "type": "amount" },
+    { "name": "tax", "label": "부가세", "type": "amount" },
+    { "name": "gross_total", "label": "할인 전 합계", "type": "amount" },
+    { "name": "total", "label": "결제 금액", "type": "amount", "required": true },
+    { "name": "payment_method", "label": "결제 수단", "type": "text" }
+  ],
+  "forbidden": [],
+  "rules": ["receipt_qty_correction", "receipt", "receipt_grounded"],
+  "excel": {
+    "sheets": [
+      { "name": "영수증", "fields": ["date", "time", "store_name", "business_no", "receipt_no", "subtotal", "tax", "gross_total", "total", "payment_method"] },
+      { "name": "품목", "list": "items" }
+    ]
+  },
+  "notes": [
+    "generic_checks=false: 기존 영수증 파이프라인과 똑같이 동작하도록 공통 검사를 끄고 규칙 3개만 씀 (수량 보정 ➔ 영수증 규칙 ➔ 근거 확인 4개 필드). 공통 검사를 켜는 것은 따로 측정한 뒤",
+    "프롬프트 파일은 통합 C 단계 전까지 src/Api/Modules/Text/Pipeline/Prompts 와 같은 내용 (테스트로 확인). C 단계에서 팩을 원본으로 하나로 합침"
+  ]
+}

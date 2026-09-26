@@ -15,10 +15,31 @@ namespace Digitizer.Engine;
 /// </summary>
 public static partial class Validator
 {
-    public static List<ValidationIssue> Validate(DocumentType type, JsonObject fields, string source)
+    /// <param name="fromImage">이미지를 직접 본 결과(VLM 폴백)면 원문 근거 확인을 건너뜀</param>
+    public static List<ValidationIssue> Validate(DocumentType type, JsonObject fields, string source, bool fromImage = false)
     {
         var issues = new List<ValidationIssue>();
-        var hay = new Haystack(source);
+        // 1) 보정 규칙 (값을 고치고 경고) ➔ 2) 공통 검사 ➔ 3) 등록된 규칙. 기존 영수증 파이프라인 순서와 같음
+        foreach (var rule in type.Rules.Where(RuleRegistry.Fixers.ContainsKey))
+            issues.AddRange(RuleRegistry.Fixers[rule](fields));
+        if (type.GenericChecks) issues.AddRange(Generic(type, fields, source, fromImage));
+        foreach (var rule in type.Rules.Where(RuleRegistry.Checks.ContainsKey))
+            issues.AddRange(RuleRegistry.Checks[rule](fields, source, fromImage));
+
+        var output = fields.ToJsonString();
+        foreach (var fb in type.Forbidden.Where(f => f.Pattern is not null))
+        {
+            var re = new Regex(fb.Pattern!);
+            if (re.IsMatch(output)) issues.Add(new("forbidden", "", IssueSeverity.Error, $"수집 금지 값이 추출 결과에 있습니다: {fb.Label}"));
+            else if (re.IsMatch(source)) issues.Add(new("forbidden_in_source", "", IssueSeverity.Warning, $"원문에 {fb.Label} 가 있습니다 (가림 필요)"));
+        }
+        return issues;
+    }
+
+    private static List<ValidationIssue> Generic(DocumentType type, JsonObject fields, string source, bool fromImage)
+    {
+        var issues = new List<ValidationIssue>();
+        var hay = fromImage ? null : new Haystack(source);
 
         foreach (var f in type.Fields)
         {
@@ -59,19 +80,19 @@ public static partial class Validator
             if (ranges > extracted)
                 issues.Add(new("list_count", "", IssueSeverity.Error, $"원문의 기간 표기 {ranges}개 > 추출된 기간 항목 {extracted}개 (빠뜨린 항목 의심)"));
         }
-
-        var output = fields.ToJsonString();
-        foreach (var fb in type.Forbidden.Where(f => f.Pattern is not null))
-        {
-            var re = new Regex(fb.Pattern!);
-            if (re.IsMatch(output)) issues.Add(new("forbidden", "", IssueSeverity.Error, $"수집 금지 값이 추출 결과에 있습니다: {fb.Label}"));
-            else if (re.IsMatch(source)) issues.Add(new("forbidden_in_source", "", IssueSeverity.Warning, $"원문에 {fb.Label} 가 있습니다 (가림 필요)"));
-        }
         return issues;
     }
 
-    private static void CheckValue(FieldDef f, JsonNode? node, string path, Haystack hay, List<ValidationIssue> issues)
+    private static void CheckValue(FieldDef f, JsonNode? node, string path, Haystack? hay, List<ValidationIssue> issues)
     {
+        if (f.Type is "amount" or "number")
+        {
+            // 숫자 칸: 형식은 스키마가 강제, 원문 근거는 금액만 (수량은 OCR 이 1을 7로 읽는 등 보정 규칙이 따로 있음)
+            if (f.Type == "amount" && hay is not null && FieldValidator.Amount(node) is { } amount && amount != 0
+                && !hay.HasDigits(decimal.Truncate(Math.Abs(amount)).ToString(CultureInfo.InvariantCulture)))
+                issues.Add(Ungrounded(f, path, amount.ToString(CultureInfo.InvariantCulture)));
+            return;
+        }
         var value = Text(node);
         if (value is null)
         {
@@ -80,36 +101,40 @@ public static partial class Validator
         }
         switch (f.Type)
         {
+            case "time":
+                if (!TimeRegex().IsMatch(value)) issues.Add(new("format", path, IssueSeverity.Error, $"시각 형식(HH:MM)이 아닙니다: {value}"));
+                else if (hay is not null && !hay.HasDigits(value[..2] + value[3..5])) issues.Add(Ungrounded(f, path, value));
+                break;
             case "phone":
                 var digits = Digits(value);
                 if (digits.Length is < 9 or > 11 || digits[0] != '0') issues.Add(new("format", path, IssueSeverity.Error, $"전화번호 형식이 아닙니다: {value}"));
-                else if (!hay.HasDigits(digits)) issues.Add(Ungrounded(f, path, value));
+                else if (hay is not null && !hay.HasDigits(digits)) issues.Add(Ungrounded(f, path, value));
                 break;
             case "email":
                 if (!EmailRegex().IsMatch(value)) issues.Add(new("format", path, IssueSeverity.Error, $"이메일 형식이 아닙니다: {value}"));
-                else if (!hay.HasText(value)) issues.Add(Ungrounded(f, path, value));
+                else if (hay is not null && !hay.HasText(value)) issues.Add(Ungrounded(f, path, value));
                 break;
             case "date":
                 if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
                     issues.Add(new("format", path, IssueSeverity.Error, $"날짜 형식(YYYY-MM-DD)이 아닙니다: {value}"));
-                else if (!hay.HasAnyDigits([$"{d:yyyyMMdd}", $"{d.Year}{d.Month}{d.Day}", $"{d:yyMMdd}"])) issues.Add(Ungrounded(f, path, value));
+                else if (hay is not null && !hay.HasAnyDigits([$"{d:yyyyMMdd}", $"{d.Year}{d.Month}{d.Day}", $"{d:yyMMdd}"])) issues.Add(Ungrounded(f, path, value));
                 break;
             case "month" or "month_or_present":
                 if (value == "present")
                 {
                     if (f.Type != "month_or_present") issues.Add(new("format", path, IssueSeverity.Error, $"{f.Label} 은 연월이어야 합니다"));
-                    else if (!PresentRegex().IsMatch(hay.Source)) issues.Add(Ungrounded(f, path, "재직 중/현재"));
+                    else if (hay is not null && !PresentRegex().IsMatch(hay.Source)) issues.Add(Ungrounded(f, path, "재직 중/현재"));
                 }
                 else if (!MonthRegex().IsMatch(value))
                     issues.Add(new("format", path, IssueSeverity.Error, $"연월 형식(YYYY-MM)이 아닙니다: {value}"));
-                else if (!hay.HasAnyDigits([value[..4] + value[5..7], value[..4] + int.Parse(value[5..7])])) issues.Add(Ungrounded(f, path, value));
+                else if (hay is not null && !hay.HasAnyDigits([value[..4] + value[5..7], value[..4] + int.Parse(value[5..7])])) issues.Add(Ungrounded(f, path, value));
                 break;
             case "longtext":
                 var words = WordRegex().Matches(value).Select(m => m.Value).Where(w => w.Length >= 2).ToList();
-                if (words.Count > 0 && words.Count(hay.HasText) * 2 < words.Count) issues.Add(Ungrounded(f, path, value));
+                if (hay is not null && words.Count > 0 && words.Count(hay.HasText) * 2 < words.Count) issues.Add(Ungrounded(f, path, value));
                 break;
             default:
-                if (!hay.HasText(value)) issues.Add(Ungrounded(f, path, value));
+                if (hay is not null && !hay.HasText(value)) issues.Add(Ungrounded(f, path, value));
                 break;
         }
     }
@@ -143,6 +168,7 @@ public static partial class Validator
 
     [GeneratedRegex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$")] private static partial Regex EmailRegex();
     [GeneratedRegex(@"^\d{4}-(0[1-9]|1[0-2])$")] private static partial Regex MonthRegex();
+    [GeneratedRegex(@"^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$")] private static partial Regex TimeRegex();
     [GeneratedRegex(@"현재|재직\s*중|재직중|present", RegexOptions.IgnoreCase)] private static partial Regex PresentRegex();
     [GeneratedRegex(@"[\p{L}\p{N}]+")] private static partial Regex WordRegex();
     [GeneratedRegex(@"[^\p{L}\p{N}@.]")] private static partial Regex NonWordRegex();

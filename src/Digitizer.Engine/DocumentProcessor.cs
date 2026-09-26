@@ -26,7 +26,7 @@ public sealed class DocumentProcessor(TextExtractor text, FieldExtractor fields)
 
     public async Task<ProcessResult> ProcessFromTextAsync(DocumentType type, SourceText source, CancellationToken ct = default)
     {
-        var extraction = await fields.ExtractAsync(type, source.Text, ct);
+        var extraction = await fields.ExtractAsync(type, source.Text, source.Source, ct);
         var issues = extraction.Fields is null ? [] : Validator.Validate(type, extraction.Fields, source.Text);
         return new ProcessResult(type.Id, type.Version, source, extraction, issues);
     }
