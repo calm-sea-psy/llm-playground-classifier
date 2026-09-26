@@ -20,6 +20,7 @@ dist/
 doc/todo.md
 doc/develop.md
 doc/retrospective.md
+doc/todo2.md
 
 # 데이터 (AI Hub 데이터·업로드 결과는 커밋하지 않음)
 data/uploads/

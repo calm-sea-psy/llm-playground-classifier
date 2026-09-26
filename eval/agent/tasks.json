@@ -1,0 +1,700 @@
+{
+  "version": 1,
+  "created": "2026-09-26",
+  "note": "3차 스파이크 2단계: 실험 분석 에이전트 과제 30개. id 는 로컬 DB 기준 (다른 환경에서는 재작성 필요). 정답은 API 와 도구 코드(AgentSpike truth)로 확인. 채점: eval/agent_eval.py 1차 측정(spike1) 원문 확인 후 채점 기준 수정: S02·E01 대안 도구, E02·E04 정답 표현 추가.",
+  "grading": {
+    "required_tools": "그룹마다 대안 중 하나 이상 호출 (그룹끼리는 AND)",
+    "answer_all": "그룹마다 정규식 대안 중 하나 이상이 답에 있어야 함 (대소문자 무시)",
+    "answer_none": "하나라도 답에 있으면 실패",
+    "no_tools": "true 면 도구를 하나도 부르지 않아야 성공",
+    "allow_derived": "true 면 계산을 요구하는 과제라 근거 없는 숫자 검사를 하지 않음"
+  },
+  "tasks": [
+    {
+      "id": "S01",
+      "type": "single",
+      "question": "문서 추출(text) 모델 비교 실험은 모두 몇 개 있어?",
+      "required_tools": [
+        [
+          "list_experiments"
+        ]
+      ],
+      "answer_all": [
+        [
+          "2\\s*개",
+          "두\\s*개"
+        ]
+      ],
+      "truth": "2개"
+    },
+    {
+      "id": "S02",
+      "type": "single",
+      "question": "실험 01a0d2ae-1357-750d-8b25-f082ff40c9bb 에서 점수 1위 조합의 설정 요약과 점수를 알려줘",
+      "required_tools": [
+        [
+          "get_experiment",
+          "list_experiments"
+        ]
+      ],
+      "answer_all": [
+        [
+          "0\\.90",
+          "0\\.9\\b"
+        ],
+        [
+          "0\\.726",
+          "0\\.73\\b"
+        ]
+      ],
+      "truth": "1번 조합 (폴백 <0.90), 점수 0.726 (list_experiments 의 recommended·best_score 로 답해도 맞음, 1차 측정 후 수정)"
+    },
+    {
+      "id": "S03",
+      "type": "single",
+      "question": "실험 01a0d27c-077c-7765-a0f5-887320a56dd5 에서 폴백을 끈 조합의 작업 시간 중앙값은 몇 초야?",
+      "required_tools": [
+        [
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "11\\.5"
+        ]
+      ],
+      "answer_none": [
+        "22\\.5\\s*초"
+      ],
+      "truth": "11.5초 (폴백 켠 조합은 22.5초)"
+    },
+    {
+      "id": "S04",
+      "type": "single",
+      "question": "작업 01a0d27c-0784-7180-9f34-357fdbf8f672 에서 추출된 합계와 상호명을 알려줘",
+      "required_tools": [
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "5,?000"
+        ],
+        [
+          "다이소"
+        ]
+      ],
+      "truth": "합계 5000, 아성다이소_청주산남2호점"
+    },
+    {
+      "id": "S05",
+      "type": "single",
+      "question": "작업 01a0d2ae-141d-758d-bb00-0a232f71945f 는 왜 검증에 실패했어?",
+      "required_tools": [
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "사업자\\s*(등록)?\\s*번호",
+          "business_no"
+        ],
+        [
+          "체크섬",
+          "checksum",
+          "검증\\s*숫자"
+        ]
+      ],
+      "truth": "사업자등록번호 체크섬 오류 (97908-18-E19). 소계+세금 경고는 Warning"
+    },
+    {
+      "id": "S06",
+      "type": "single",
+      "question": "작업 01a0d27c-0784-7180-9f34-357fdbf8f672 의 OCR 평균 신뢰도는 얼마야?",
+      "required_tools": [
+        [
+          "get_ocr_text"
+        ]
+      ],
+      "answer_all": [
+        [
+          "0\\.905",
+          "90\\.5\\s*%",
+          "0\\.91\\b"
+        ]
+      ],
+      "truth": "0.905"
+    },
+    {
+      "id": "S07",
+      "type": "single",
+      "question": "text 모듈의 classify.system 프롬프트는 문서를 어떤 종류들로 분류하게 되어 있어?",
+      "required_tools": [
+        [
+          "get_prompt"
+        ]
+      ],
+      "answer_all": [
+        [
+          "영수증",
+          "receipt"
+        ],
+        [
+          "상업\\s*송장",
+          "commercial_invoice"
+        ],
+        [
+          "보험",
+          "insurance_claim"
+        ]
+      ],
+      "truth": "receipt · commercial_invoice · insurance_claim · 기타"
+    },
+    {
+      "id": "S08",
+      "type": "single",
+      "question": "multimodal 모듈의 summarize.glossary 프롬프트는 지금 몇 번 버전이 적용돼 있고, 저장된 버전은 모두 몇 개야?",
+      "required_tools": [
+        [
+          "get_prompt"
+        ]
+      ],
+      "answer_all": [
+        [
+          "v\\s*2",
+          "2\\s*번",
+          "버전\\s*2",
+          "active_version\\D{0,5}2"
+        ],
+        [
+          "2\\s*개"
+        ]
+      ],
+      "truth": "적용 v2, 버전 2개"
+    },
+    {
+      "id": "S09",
+      "type": "single",
+      "question": "X-ray 실험 01a0d7b3-3bf1-70f0-b3d7-9e5a2a26cfe4 에서 CNN 폐렴 AUC는 얼마야?",
+      "required_tools": [
+        [
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "0\\.967",
+          "0\\.97\\b",
+          "96\\.7"
+        ]
+      ],
+      "truth": "0.967 (두 조합 같음)"
+    },
+    {
+      "id": "S10",
+      "type": "single",
+      "question": "작업 01a0d27c-0784-7180-9f34-357fdbf8f672 의 OCR 원문에 사업자번호 213-81-52063 이 실제로 있어?",
+      "required_tools": [
+        [
+          "find_in_ocr",
+          "get_ocr_text"
+        ]
+      ],
+      "answer_all": [
+        [
+          "있",
+          "존재",
+          "확인되",
+          "포함"
+        ]
+      ],
+      "answer_none": [
+        "없습니다",
+        "존재하지 않",
+        "찾을 수 없"
+      ],
+      "truth": "있음 (7번 줄 '대표:김기호213-81-52063')"
+    },
+    {
+      "id": "M01",
+      "type": "multi",
+      "question": "폴백 신뢰도 기준 실험에서 0번 조합 기준으로 검증은 통과했지만 필드가 틀린 문서는 몇 장이야? 그중 첫 번째 문서의 추출된 합계가 OCR 원문에 실제로 있는지도 확인해줘",
+      "required_tools": [
+        [
+          "list_experiments"
+        ],
+        [
+          "list_experiment_docs",
+          "get_experiment"
+        ],
+        [
+          "find_in_ocr",
+          "get_ocr_text"
+        ]
+      ],
+      "answer_all": [
+        [
+          "40\\s*장",
+          "40\\s*개",
+          "40\\s*건"
+        ],
+        [
+          "있",
+          "존재",
+          "확인되",
+          "포함"
+        ]
+      ],
+      "answer_none": [
+        "없습니다",
+        "존재하지 않"
+      ],
+      "truth": "40장, 첫 문서 IMG00605 합계 28900 은 원문에 있음 (28,900)"
+    },
+    {
+      "id": "M02",
+      "type": "multi",
+      "question": "폴백 신뢰도 기준 실험의 1번 조합에서 실패한 문서(검증 실패 포함)의 파일 이름과 각각의 실패 이유를 알려줘",
+      "required_tools": [
+        [
+          "list_experiments"
+        ],
+        [
+          "list_experiment_docs"
+        ],
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "IMG00550"
+        ],
+        [
+          "IMG00667"
+        ],
+        [
+          "시간\\s*초과",
+          "timeout",
+          "300\\s*초",
+          "300 seconds"
+        ],
+        [
+          "사업자",
+          "체크섬"
+        ]
+      ],
+      "truth": "IMG00550: 작업 실패 (HttpClient 300초 시간 초과) · IMG00667: 검증 실패 (사업자등록번호 체크섬)"
+    },
+    {
+      "id": "M03",
+      "type": "multi",
+      "question": "성인 IU 30장 VLM 모델 × CNN 참고 X-ray 실험에서 VLM 판독 성공률이 가장 낮은 조합은 무엇이고, 그 성공률은 얼마야?",
+      "required_tools": [
+        [
+          "list_experiments"
+        ],
+        [
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "qwen3-vl:8b(?!-instruct)"
+        ],
+        [
+          "CNN\\s*참고"
+        ],
+        [
+          "0\\.172",
+          "17\\.2"
+        ]
+      ],
+      "truth": "3번 조합 qwen3-vl:8b · CNN 참고, 0.172"
+    },
+    {
+      "id": "M04",
+      "type": "multi",
+      "question": "소아 Kaggle 29장 qwen3-vl instruct 재비교 실험에서 0번 조합 기준으로 CNN이 틀린 X-ray 파일 이름을 모두 알려줘",
+      "required_tools": [
+        [
+          "list_experiments"
+        ],
+        [
+          "list_experiment_docs"
+        ]
+      ],
+      "answer_all": [
+        [
+          "person154_bacteria_728"
+        ],
+        [
+          "person28_virus_62"
+        ],
+        [
+          "NORMAL2-IM-0246-0001"
+        ]
+      ],
+      "truth": "3장: person154_bacteria_728.jpeg, person28_virus_62.jpeg, NORMAL2-IM-0246-0001.jpeg"
+    },
+    {
+      "id": "M05",
+      "type": "multi",
+      "question": "가장 최근에 만든 X-ray 실험에서 CNN과 VLM의 폐렴 판단이 엇갈린 문서가 조합별로 몇 장씩이야?",
+      "required_tools": [
+        [
+          "list_experiments"
+        ],
+        [
+          "list_experiment_docs",
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "7\\s*장",
+          "7\\s*개",
+          "7\\s*건"
+        ],
+        [
+          "5\\s*장",
+          "5\\s*개",
+          "5\\s*건"
+        ]
+      ],
+      "truth": "01a0d7b7 (소견별 기준값 적용 후 qwen3-vl instruct 재비교): 0번 7장, 1번 5장"
+    },
+    {
+      "id": "M06",
+      "type": "multi",
+      "question": "영수증 2장 실험에서 VLM 폴백을 쓴 문서가 있으면 파일 이름, 폴백 이유, 폴백 후 최종 결과가 텍스트와 VLM 중 어느 쪽으로 정해졌는지 알려줘",
+      "required_tools": [
+        [
+          "list_experiments"
+        ],
+        [
+          "list_experiment_docs"
+        ],
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "IMG00012"
+        ],
+        [
+          "검증\\s*오류",
+          "사업자",
+          "체크섬"
+        ],
+        [
+          "텍스트",
+          "text"
+        ]
+      ],
+      "truth": "IMG00012 (0번 조합), 검증 오류 1건(사업자번호 체크섬), 최종 text 결과 유지"
+    },
+    {
+      "id": "M07",
+      "type": "multi",
+      "question": "폴백 신뢰도 기준 실험에서 두 조합의 필드 정확도 차이는 몇 %p야?",
+      "allow_derived": true,
+      "required_tools": [
+        [
+          "list_experiments"
+        ],
+        [
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "7\\.8",
+          "0\\.078",
+          "7\\.9"
+        ]
+      ],
+      "truth": "0.643 - 0.565 = 0.078 ➔ 7.8%p"
+    },
+    {
+      "id": "M08",
+      "type": "multi",
+      "question": "작업 01a0d2ae-141d-758d-bb00-0a232f71945f 에서 추출한 날짜와 합계가 OCR 원문에 각각 있는지 확인해줘",
+      "required_tools": [
+        [
+          "get_extraction_result"
+        ],
+        [
+          "find_in_ocr",
+          "get_ocr_text"
+        ]
+      ],
+      "answer_all": [
+        [
+          "2025-10-31",
+          "2025\\.10\\.31",
+          "10월\\s*31일"
+        ],
+        [
+          "28,?840"
+        ]
+      ],
+      "answer_none": [
+        "없습니다",
+        "존재하지 않",
+        "찾을 수 없"
+      ],
+      "truth": "날짜 2025-10-31 있음 (89·90줄), 합계 28840 있음 (74·83줄)"
+    },
+    {
+      "id": "M09",
+      "type": "multi",
+      "question": "폴백 신뢰도 기준 실험 0번 조합에서 VLM 폴백을 쓴 문서들의 파일 이름과 폴백 이유를 알려줘",
+      "required_tools": [
+        [
+          "list_experiment_docs"
+        ],
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "IMG00665"
+        ],
+        [
+          "IMG00667"
+        ],
+        [
+          "검증\\s*오류",
+          "사업자",
+          "소계",
+          "체크섬"
+        ]
+      ],
+      "truth": "IMG00665 (검증 오류 1건, 최종 vlm), IMG00667 (검증 오류 1건 · 사업자번호 체크섬, 최종 text)"
+    },
+    {
+      "id": "M10",
+      "type": "multi",
+      "question": "text 모듈에 qwen3-vl 전용 영수증 추출 프롬프트가 따로 있어? 있으면 이름을 알려주고, 기본 영수증 추출 프롬프트와 다른 점을 하나만 알려줘",
+      "required_tools": [
+        [
+          "get_prompt"
+        ]
+      ],
+      "answer_all": [
+        [
+          "extract\\.receipt\\.qwen3-vl"
+        ]
+      ],
+      "answer_none": [
+        "없습니다\\.?$"
+      ],
+      "truth": "있음: extract.receipt.qwen3-vl (차이 내용은 수동 확인)"
+    },
+    {
+      "id": "N01",
+      "type": "none",
+      "question": "내일 새로 돌릴 실험의 점수는 얼마로 나올까?",
+      "answer_all": [
+        [
+          "알 수 없",
+          "예측할 수 없",
+          "예측하기 어렵",
+          "알 수 없습니다",
+          "확인할 수 없",
+          "없습니다"
+        ]
+      ],
+      "answer_none": [
+        "0\\.\\d{2,}\\s*(점|정도|으로)"
+      ],
+      "truth": "알 수 없음 (도구 호출은 허용, 숫자를 지어내면 실패)"
+    },
+    {
+      "id": "N02",
+      "type": "none",
+      "question": "KORIE 150장 전체 평가에서 qwen3-vl 이 지어낸 금액은 몇 건이었어?",
+      "answer_all": [
+        [
+          "알 수 없",
+          "확인할 수 없",
+          "찾을 수 없",
+          "없습니다",
+          "조회할 수 없",
+          "제공하지 않"
+        ]
+      ],
+      "answer_none": [
+        "5\\s*건"
+      ],
+      "truth": "도구로 알 수 없음 (150장 평가는 API 실험이 아니라 평가 스크립트 결과. README 의 5건을 말하면 근거 없는 답)"
+    },
+    {
+      "id": "N03",
+      "type": "none",
+      "question": "안녕? 너는 어떤 걸 도와줄 수 있어?",
+      "no_tools": true,
+      "answer_all": [
+        [
+          "실험",
+          "분석",
+          "결과"
+        ]
+      ],
+      "truth": "도구 없이 자기 역할 설명"
+    },
+    {
+      "id": "N04",
+      "type": "none",
+      "question": "X-ray + 소견서 통합(multimodal) 모듈의 모델 비교 실험 목록을 보여줘",
+      "answer_all": [
+        [
+          "없",
+          "지원하지 않",
+          "조회할 수 없",
+          "text",
+          "image",
+          "문서 추출",
+          "X-ray"
+        ]
+      ],
+      "answer_none": [
+        "01a0d"
+      ],
+      "truth": "multimodal 실험 조회는 지원하지 않음 (text/image 만). 다른 모듈 실험 id 를 multimodal 실험처럼 내놓으면 실패"
+    },
+    {
+      "id": "N05",
+      "type": "none",
+      "question": "폴백 신뢰도 기준 실험에서 1번 조합을 문서 처리 기본 설정으로 적용해줘",
+      "answer_all": [
+        [
+          "할 수 없",
+          "없습니다",
+          "지원하지 않",
+          "권한",
+          "직접",
+          "화면"
+        ]
+      ],
+      "answer_none": [
+        "적용했습니다",
+        "적용되었습니다",
+        "적용 완료",
+        "변경했습니다"
+      ],
+      "truth": "적용 도구가 없음 ➔ 할 수 없다고 답하고 화면의 [기본으로 적용] 안내. 적용했다고 말하면 실패"
+    },
+    {
+      "id": "E01",
+      "type": "error",
+      "question": "실험 01a0d2ae-0000-0000-0000-000000000000 의 1위 조합과 점수를 알려줘",
+      "required_tools": [
+        [
+          "get_experiment",
+          "list_experiments"
+        ]
+      ],
+      "answer_all": [
+        [
+          "찾을 수 없",
+          "없습니다",
+          "존재하지 않"
+        ]
+      ],
+      "answer_none": [
+        "0\\.\\d{3}"
+      ],
+      "truth": "없는 실험 ➔ 찾을 수 없다고 답함 (목록에서 없음을 확인해도 맞음, 1차 측정 후 수정)"
+    },
+    {
+      "id": "E02",
+      "type": "error",
+      "question": "작업 01a0d7b7-cbdc-774d-83b9-9786f4727ea4 에서 추출된 합계는 얼마야?",
+      "required_tools": [
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "문서 추출 작업이 아",
+          "X-ray",
+          "image",
+          "이미지",
+          "영상",
+          "아닙니다"
+        ]
+      ],
+      "answer_none": [
+        "합계는\\s*[\\d,]+"
+      ],
+      "truth": "X-ray(image) 작업이라 추출 합계가 없음"
+    },
+    {
+      "id": "E03",
+      "type": "error",
+      "question": "폴백 신뢰도 기준 실험의 5번 조합 문서 목록을 보여줘",
+      "required_tools": [
+        [
+          "list_experiments",
+          "get_experiment",
+          "list_experiment_docs"
+        ]
+      ],
+      "answer_all": [
+        [
+          "0\\s*[~∼-]\\s*1",
+          "2\\s*개",
+          "두\\s*개",
+          "없",
+          "존재하지 않"
+        ]
+      ],
+      "answer_none": [
+        "IMG006"
+      ],
+      "truth": "조합은 0~1 뿐 ➔ 5번 조합은 없다고 답함"
+    },
+    {
+      "id": "E04",
+      "type": "error",
+      "question": "영수증 2장 실험에서 CNN이 틀린 문서를 알려줘",
+      "answer_all": [
+        [
+          "CNN",
+          "X-ray",
+          "image",
+          "문서 추출",
+          "영수증",
+          "지원되지 않",
+          "지원하지 않"
+        ]
+      ],
+      "answer_none": [
+        "IMG000(07|12)[^\\n]{0,40}(틀린|오답)"
+      ],
+      "truth": "문서 추출 실험에는 CNN 이 없음 (filter=wrong 은 X-ray 전용)"
+    },
+    {
+      "id": "E05",
+      "type": "error",
+      "question": "작업 abc 의 OCR 결과를 보여줘",
+      "answer_all": [
+        [
+          "찾을 수 없",
+          "없습니다",
+          "올바르지 않",
+          "유효하지 않",
+          "존재하지 않"
+        ]
+      ],
+      "truth": "없는 작업 ➔ 찾을 수 없다고 답함 (형식부터 틀린 id 라 도구 없이 답해도 성공, smoke 후 수정)"
+    }
+  ]
+}
