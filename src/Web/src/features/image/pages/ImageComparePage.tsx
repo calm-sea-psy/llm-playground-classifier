@@ -27,7 +27,7 @@ const MAX_COMBOS = 4
 const SEC_PER_JOB = 7
 
 /**
- * X-ray 모델 비교: 영상 N장 × 판독 조합 M개 실험 ➔ 저장 ➔ 조합별 점수·순위 ➔ 1위 추천,
+ * 이미지 모델 비교: 이미지 N장 × 판독 조합 M개 실험 ➔ 저장 ➔ 조합별 점수·순위 ➔ 1위 추천,
  * [기본으로 적용]을 누르면 판독 기본 설정이 바뀐다 (Text 모델 비교와 같은 흐름)
  */
 export function ImageComparePage() {
@@ -160,13 +160,13 @@ export function ImageComparePage() {
         <div>
           <h2>새 실험</h2>
           <p className="muted small">
-            같은 X-ray 들을 조합별로 판독해 CNN·VLM 의 폐렴 판단 정확도, 두 판단의 일치율, 처리 시간을 비교합니다. 정답은 파일
-            이름으로 찾습니다 (Kaggle 소아: person… = 폐렴 · IM-… = 정상, IU 성인: 소견서). 정답이 있는 영상이어야 순위를 매깁니다.
+            같은 이미지들을 조합별로 판독해 CNN · VLM 의 이진 판단 정확도, 두 판단의 일치율, 처리 시간을 비교합니다. 정답은 테스트
+            데이터의 파일 이름으로 찾습니다 (Kaggle 소아: person… = 양성 · IM-… = 정상, IU 성인: 동반 문서). 정답이 있는 이미지여야 순위를 매깁니다.
           </p>
         </div>
         <label className="small name-field">
           실험 이름
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: IU 성인 30장 VLM 독립 vs CNN 참고" maxLength={200} />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="예: 30장 VLM 독립 vs CNN 참고" maxLength={200} />
         </label>
         <label className="small name-field">
           실험 설명 (선택)
@@ -184,8 +184,8 @@ export function ImageComparePage() {
           onFiles={setFiles}
           disabled={submitting}
           max={MAX_FILES}
-          label="실험할 흉부 X-ray 를 끌어다 놓거나 클릭해서 선택 (여러 장)"
-          hint="Kaggle 소아(파일 이름)·IU 성인(소견서)이면 정답으로 민감도·특이도까지 계산"
+          label="실험할 이미지를 끌어다 놓거나 클릭해서 선택 (여러 장)"
+          hint="정답이 있는 테스트 데이터(Kaggle 소아: 파일 이름, IU 성인: 동반 문서)면 민감도 · 특이도까지 계산"
         />
         {options && (
           <div className="combos">
@@ -210,7 +210,7 @@ export function ImageComparePage() {
         )}
         <div className="upload-actions">
           <span className="muted small">
-            {jobs ? `작업 ${jobs}건 · 예상 약 ${Math.max(1, Math.round((jobs * SEC_PER_JOB) / 60))}분` : 'X-ray 를 선택하세요'}
+            {jobs ? `작업 ${jobs}건 · 예상 약 ${Math.max(1, Math.round((jobs * SEC_PER_JOB) / 60))}분` : '이미지를 선택하세요'}
           </span>
           <button type="submit" className="primary" disabled={!files.length || !combos.length || submitting}>
             {submitting ? '업로드 중…' : '실험 시작'}

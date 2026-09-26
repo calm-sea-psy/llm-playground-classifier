@@ -40,7 +40,7 @@ export interface ImageIssue {
 export interface ImageResult {
   jobId: string
   population: Population
-  /** "엔진:소견" (소아 pneumonia:Pneumonia, 성인 xrv:Consolidation) */
+  /** "엔진:항목" (파인튜닝 pneumonia:Pneumonia, 사전학습 xrv:Consolidation) */
   pneumoniaSource: string
   pneumoniaProbability: number | null
   pneumoniaPositive: boolean | null
@@ -60,10 +60,11 @@ export const getImageResult = (jobId: string) => getJson<ImageResult>(`/api/imag
 
 export const heatmapUrl = (jobId: string, role: HeatmapRole) => `/api/image/jobs/${jobId}/heatmap/${role}`
 
-export function createImageJob(file: File, population: Population, model?: string) {
+/** population · model 을 빼면 판독 기본 설정 (화면은 항상 기본 설정, 덮어쓰기는 평가 스크립트용) */
+export function createImageJob(file: File, population?: Population, model?: string) {
   const form = new FormData()
   form.append('file', file)
-  form.append('population', population)
+  if (population) form.append('population', population)
   if (model) form.append('model', model)
   return postForm<JobDto>('/api/image/jobs', form)
 }

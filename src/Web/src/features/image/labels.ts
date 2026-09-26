@@ -22,12 +22,13 @@ const FINDINGS: Record<string, string> = {
 
 export const findingName = (label: string) => FINDINGS[label] ?? label
 
-export const POPULATION_NAMES = { adult: '성인', pediatric: '소아' } as const
+/** CNN 이진 판단 모델 (API 값 adult · pediatric 은 테스트 데이터 이름에서 온 키) */
+export const POPULATION_NAMES = { adult: '사전학습 모델', pediatric: '파인튜닝 모델' } as const
 
-/** "pneumonia:Pneumonia" ➔ "소아 폐렴 모델 (Pneumonia)" 식 설명 */
+/** "pneumonia:Pneumonia" ➔ "파인튜닝 모델 · 폐렴" 식 설명 */
 export function sourceName(source: string) {
   const [engine, label] = source.split(':')
-  const model = engine === 'pneumonia' ? '소아 폐렴 모델' : engine === 'xrv' ? 'xrv 소견 모델' : engine
+  const model = engine === 'pneumonia' ? '파인튜닝 모델' : engine === 'xrv' ? 'xrv 사전학습 모델' : engine
   return `${model} · ${findingName(label)}`
 }
 

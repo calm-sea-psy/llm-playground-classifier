@@ -75,7 +75,7 @@ public static class ImageExperimentEndpoints
             {
                 Id = Guid.CreateVersion7(),
                 JobType = ImageModule.ModuleKey,
-                Name = string.IsNullOrWhiteSpace(name) ? $"X-ray 실험 {clock.GetLocalNow():MM-dd HH:mm}" : name.Trim(),
+                Name = string.IsNullOrWhiteSpace(name) ? $"이미지 실험 {clock.GetLocalNow():MM-dd HH:mm}" : name.Trim(),
                 Description = Clean(description),
                 Combos = JsonSerializer.Serialize(comboList, ImageSettings.Json),
                 DocCount = files.Count,

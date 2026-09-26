@@ -1,7 +1,7 @@
 import type { FeatureModule } from '../registry'
 import { MultimodalRoutes } from './MultimodalRoutes'
 
-/** Step 3 통합: 흉부 X-ray + 소견서 ➔ 영상 분석 + 소견서 요약 ➔ 일치 비교 ➔ 환자 종합 보고서 */
+/** Step 3 통합: 이미지 + 텍스트 문서 ➔ 이미지 분석 + 문서 요약 ➔ 일치 비교 ➔ 종합 보고서 */
 export const multimodalFeature: FeatureModule = {
   key: 'multimodal',
   title: 'CNN + VLM + 텍스트 추출',

@@ -4,30 +4,27 @@ import { listJobs } from '../../../shared/api/jobs'
 import { isFinished, type JobDto } from '../../../shared/api/types'
 import { StatusBadge } from '../../../shared/components/StatusBadge'
 import { UploadDropzone } from '../../../shared/components/UploadDropzone'
-import { getImageSettings, type Population } from '../../image/api'
+import { getImageSettings, type ImageSettingsDto } from '../../image/api'
+import { AppliedPipeline } from '../../image/components/AppliedPipeline'
 import { Disclaimer } from '../../image/components/Disclaimer'
-import { POPULATION_NAMES } from '../../image/labels'
 import { createMultimodalJob } from '../api'
 
 const ACCEPT = '.png,.jpg,.jpeg,.bmp,.tif,.tiff,.webp'
 const REFRESH_MS = 3000
 
-/** X-ray + 소견서(텍스트 붙여넣기 또는 이미지) 업로드 + 최근 작업 */
+/** 이미지 + 텍스트 문서 이미지(OCR) 업로드 + 최근 작업. 이미지 분석 설정은 CNN + VLM 판독 기본 설정 그대로 (표시만) */
 export function MultimodalHomePage() {
   const navigate = useNavigate()
   const [xray, setXray] = useState<File | null>(null)
-  const [mode, setMode] = useState<'text' | 'image'>('text')
-  const [reportText, setReportText] = useState('')
   const [reportFile, setReportFile] = useState<File | null>(null)
-  const [population, setPopulation] = useState<Population>('adult')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [jobs, setJobs] = useState<JobDto[]>([])
-  const [model, setModel] = useState<string | null>(null)
+  const [settings, setSettings] = useState<ImageSettingsDto | null>(null)
 
   useEffect(() => {
     getImageSettings()
-      .then((s) => setModel(s.settings.model))
+      .then(setSettings)
       .catch(() => {})
   }, [])
 
@@ -40,16 +37,15 @@ export function MultimodalHomePage() {
     return () => clearInterval(timer)
   }, [hasRunning])
 
-  const reportReady = mode === 'text' ? reportText.trim().length > 0 : reportFile !== null
+  const model = settings?.settings.model
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!xray || !reportReady) return
+    if (!xray || !reportFile) return
     setSubmitting(true)
     setError(null)
     try {
-      const report = mode === 'text' ? { text: reportText } : { file: reportFile! }
-      const job = await createMultimodalJob(xray, report, population)
+      const job = await createMultimodalJob(xray, reportFile)
       navigate(`/multimodal/jobs/${job.jobId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -64,73 +60,45 @@ export function MultimodalHomePage() {
         <div>
           <h2>CNN + VLM + 텍스트 추출</h2>
           <p className="muted small">
-            흉부 X-ray 분석(CNN·VLM) 과 소견서 요약(LLM) 을 소견별로 맞춰 보고, 두 결과를 묶어 환자 종합 보고서를 만듭니다.
-            소견서와 자동 분석이 어긋나면 표시합니다.
+            이미지 분석(CNN · VLM)과 텍스트 문서 요약(LLM)을 항목별로 맞춰 보고, 두 결과를 묶어 종합 보고서를 만듭니다.
+            문서와 자동 분석이 어긋나면 표시합니다.
           </p>
         </div>
 
         <div className="multimodal-inputs">
           <div>
-            <h4>흉부 X-ray</h4>
+            <h4>이미지</h4>
             <UploadDropzone
               accept={ACCEPT}
               file={xray}
               onFile={setXray}
               disabled={submitting}
-              label="흉부 X-ray 를 끌어다 놓거나 클릭해서 선택"
+              label="이미지를 끌어다 놓거나 클릭해서 선택"
             />
           </div>
           <div>
-            <h4>소견서</h4>
-            <div className="tabs small">
-              <button type="button" className={mode === 'text' ? 'on' : ''} onClick={() => setMode('text')}>
-                텍스트 붙여넣기
-              </button>
-              <button type="button" className={mode === 'image' ? 'on' : ''} onClick={() => setMode('image')}>
-                소견서 이미지 (OCR)
-              </button>
-            </div>
-            {mode === 'text' ? (
-              <textarea
-                className="report-input"
-                value={reportText}
-                onChange={(e) => setReportText(e.target.value)}
-                placeholder={'예) INDICATION: ...\nFINDINGS: ...\nIMPRESSION: ...'}
-                disabled={submitting}
-                maxLength={20000}
-              />
-            ) : (
-              <UploadDropzone
-                accept={ACCEPT}
-                file={reportFile}
-                onFile={setReportFile}
-                disabled={submitting}
-                label="소견서 이미지를 끌어다 놓거나 클릭해서 선택"
-              />
-            )}
+            <h4>텍스트 문서 (OCR)</h4>
+            <UploadDropzone
+              accept={ACCEPT}
+              file={reportFile}
+              onFile={setReportFile}
+              disabled={submitting}
+              label="문서 이미지를 끌어다 놓거나 클릭해서 선택"
+            />
           </div>
         </div>
 
-        <fieldset className="population" disabled={submitting}>
-          <legend className="small">대상</legend>
-          {(['adult', 'pediatric'] as const).map((p) => (
-            <label key={p} className="small">
-              <input type="radio" name="population" value={p} checked={population === p} onChange={() => setPopulation(p)} />{' '}
-              {POPULATION_NAMES[p]}
-            </label>
-          ))}
-        </fieldset>
+        <AppliedPipeline
+          settings={settings}
+          extra={[
+            { label: '텍스트 문서', value: '문서 이미지 ➔ OCR ➔ 읽기 순서 텍스트 ➔ LLM 요약' },
+            ...(model ? [{ label: 'LLM', value: `${model} (VLM 판독 · 문서 요약 · 종합 보고서 공통)` }] : []),
+          ]}
+        />
 
         <div className="upload-actions">
-          <span className="muted small">
-            영상 분석 설정은 <Link to="/image">CNN + VLM 판독 기본 설정</Link>을 따릅니다
-            {model && (
-              <>
-                {' '}· LLM <strong>{model}</strong> (VLM 판독 · 소견서 요약 · 종합 보고서 공통)
-              </>
-            )}
-          </span>
-          <button type="submit" className="primary" disabled={!xray || !reportReady || submitting}>
+          <span />
+          <button type="submit" className="primary" disabled={!xray || !reportFile || submitting}>
             {submitting ? '업로드 중…' : '종합 보고서 만들기'}
           </button>
         </div>
@@ -146,7 +114,7 @@ export function MultimodalHomePage() {
             <table className="jobs">
               <thead>
                 <tr>
-                  <th>X-ray</th>
+                  <th>이미지</th>
                   <th>상태</th>
                   <th className="hide-sm">메시지</th>
                   <th title="끝난 작업은 완료 시각, 진행 중이면 접수 시각">완료 시각</th>

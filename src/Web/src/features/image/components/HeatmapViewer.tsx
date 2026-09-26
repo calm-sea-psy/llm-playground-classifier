@@ -7,7 +7,7 @@ export interface HeatmapLayer {
   role: HeatmapRole
   title: string
   label: string
-  /** 이 소견이 양성인지 (음성 소견의 히트맵은 의미가 약함) */
+  /** 이 항목이 양성인지 (음성 항목의 히트맵은 의미가 약함) */
   positive: boolean
   region: [number, number, number, number]
 }
@@ -40,7 +40,7 @@ function colorize(src: string): Promise<string> {
   })
 }
 
-/** 원본 X-ray 위에 Grad-CAM 을 겹쳐 보여줌. region 은 원본 픽셀 좌표라 % 로 바꿔 위치를 맞춤 */
+/** 원본 이미지 위에 Grad-CAM 을 겹쳐 보여줌. region 은 원본 픽셀 좌표라 % 로 바꿔 위치를 맞춤 */
 export function HeatmapViewer({
   jobId,
   width,
@@ -91,7 +91,7 @@ export function HeatmapViewer({
         )}
       </div>
       <div className="heatmap-wrap">
-        <img src={jobFileUrl(jobId)} alt="업로드한 X-ray" />
+        <img src={jobFileUrl(jobId)} alt="업로드한 이미지" />
         {layer && overlays[layer.role] && (
           <img
             className="heatmap-overlay"
@@ -109,13 +109,13 @@ export function HeatmapViewer({
       </div>
       {layer && !layer.positive && (
         <p className="text-warn small">
-          {findingName(layer.label)} 은(는) 음성(기준 미만)입니다. Grad-CAM 은 항상 가장 강한 곳을 표시하므로, 음성 소견의 히트맵이
+          {findingName(layer.label)} 은(는) 음성(기준 미만)입니다. Grad-CAM 은 항상 가장 강한 곳을 표시하므로, 음성 항목의 히트맵이
           가리키는 영역은 의미가 약합니다.
         </p>
       )}
       <p className="muted small">
         {error ??
-          '색이 진할수록(빨강) 모델이 그 소견을 판단할 때 크게 본 영역입니다 (Grad-CAM). 모델은 가운데 정사각형 영역만 봅니다.'}
+          '색이 진할수록(빨강) 모델이 그 항목을 판단할 때 크게 본 영역입니다 (Grad-CAM). 모델은 가운데 정사각형 영역만 봅니다.'}
       </p>
     </div>
   )

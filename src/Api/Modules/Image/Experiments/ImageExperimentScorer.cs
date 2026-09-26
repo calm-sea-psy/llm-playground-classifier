@@ -86,9 +86,9 @@ public sealed record ImageExperimentSummaryDto(
 public sealed class ImageExperimentScorer(AppDbContext db, ImageLabels labels)
 {
     public const string Formula =
-        "정답이 있으면 0.5×CNN 폐렴 균형 정확도 + 0.4×VLM 폐렴 균형 정확도×VLM 판독 성공률 + 0.1×속도 (VLM 판독을 끈 조합은 0.9×CNN + 0.1×속도). "
-        + "균형 정확도 = (민감도 + 특이도) ÷ 2, 속도 = min(1, 5초 ÷ 작업 시간 중앙값). VLM 지표·일치율은 판독에 성공한 영상 기준. "
-        + "정답이 없는 영상만 있으면 순위를 매기지 않음";
+        "정답이 있으면 0.5×CNN 이진 판단 균형 정확도 + 0.4×VLM 이진 판단 균형 정확도×VLM 판독 성공률 + 0.1×속도 (VLM 판독을 끈 조합은 0.9×CNN + 0.1×속도). "
+        + "균형 정확도 = (민감도 + 특이도) ÷ 2, 속도 = min(1, 5초 ÷ 작업 시간 중앙값). VLM 지표·일치율은 판독에 성공한 이미지 기준. "
+        + "정답이 없는 이미지만 있으면 순위를 매기지 않음";
 
     public async Task<ImageExperimentDetailDto> ScoreAsync(Experiment experiment, CancellationToken ct)
     {

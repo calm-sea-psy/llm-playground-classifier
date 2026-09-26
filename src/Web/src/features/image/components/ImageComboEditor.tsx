@@ -11,7 +11,7 @@ interface Props {
   disabled?: boolean
 }
 
-/** X-ray 실험 조합 하나: VLM 모델 · 대상(폐렴 판단 출처) · VLM 판독 켜기 · VLM 에 CNN 결과 보여 주기 */
+/** 이미지 실험 조합 하나: VLM 모델 · CNN 모델(이진 판단 출처) · VLM 판독 켜기 · VLM 에 CNN 결과 보여 주기 */
 export function ImageComboEditor({ index, value, options, onChange, onRemove, isDefault, disabled }: Props) {
   const set = <K extends keyof ImageSettings>(key: K, v: ImageSettings[K]) => onChange({ ...value, [key]: v })
 
@@ -30,7 +30,7 @@ export function ImageComboEditor({ index, value, options, onChange, onRemove, is
         </select>
       </label>
       <label>
-        <span title="폐렴 판단 출처: 소아 = 소아 파인튜닝 모델, 성인 = xrv 경화 출력">대상</span>
+        <span title="이진 판단 출처: 파인튜닝 모델 = 테스트 데이터로 파인튜닝, 사전학습 모델 = xrv 경화 출력">CNN 모델</span>
         <select value={value.population} onChange={(e) => set('population', e.target.value as Population)}>
           {options.populations.map((p) => (
             <option key={p} value={p}>

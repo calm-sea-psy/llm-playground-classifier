@@ -107,8 +107,8 @@ public sealed class ImagePipeline(LlmClient llm, ImagePrompts prompts)
         if (cnnPneumonia is not null && cnnPneumonia.Positive != vlmPneumonia)
         {
             issues.Add(new("pneumonia_disagree", IssueSeverity.Error,
-                $"폐렴 판단 불일치: CNN({pneumoniaSource}) {(cnnPneumonia.Positive ? "양성" : "음성")} (확률 {cnnPneumonia.Probability:0.000}, 기준 {cnnPneumonia.Threshold:0.###}) " +
-                $"vs VLM {(vlmPneumonia ? "폐렴 의심" : "폐렴 의심 아님")} ➔ 사람 확인 필요"));
+                $"이진 판단 불일치: CNN({pneumoniaSource}) {(cnnPneumonia.Positive ? "양성" : "음성")} (확률 {cnnPneumonia.Probability:0.000}, 기준 {cnnPneumonia.Threshold:0.###}) " +
+                $"vs VLM {(vlmPneumonia ? "양성 의심" : "양성 의심 아님")} ➔ 사람 확인 필요"));
         }
         if (vlmNormal && positives.Count > 0)
         {

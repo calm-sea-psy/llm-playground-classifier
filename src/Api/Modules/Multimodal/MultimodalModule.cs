@@ -39,7 +39,8 @@ public sealed class MultimodalModule : IPipelineModule
 
     public void MapEndpoints(RouteGroupBuilder group)
     {
-        // X-ray + 소견서(텍스트 또는 이미지 중 하나) ➔ 202 + jobId. X-ray 분석 설정은 판독 기본 설정 + 대상·모델
+        // 이미지 + 텍스트 문서(텍스트 또는 이미지 중 하나) ➔ 202 + jobId. 이미지 분석 설정은 판독 기본 설정.
+        // 화면은 문서 이미지(OCR)만 보내고 설정을 바꾸지 않음. reportText · population · model 덮어쓰기는 평가 스크립트(eval/multimodal_eval.py)용
         group.MapPost("/jobs", async (
             [FromForm] IFormFile xray,
             [FromForm] string? reportText,
@@ -59,12 +60,12 @@ public sealed class MultimodalModule : IPipelineModule
             var hasText = !string.IsNullOrWhiteSpace(reportText);
             if (hasText == (reportFile is not null))
             {
-                return Results.Problem("소견서는 텍스트(reportText) 또는 이미지(reportFile) 중 하나만 보내세요",
+                return Results.Problem("텍스트 문서는 텍스트(reportText) 또는 이미지(reportFile) 중 하나만 보내세요",
                     statusCode: StatusCodes.Status400BadRequest);
             }
             if (hasText && reportText!.Length > MaxReportChars)
             {
-                return Results.Problem($"소견서 텍스트는 {MaxReportChars:N0}자 이하여야 합니다", statusCode: StatusCodes.Status400BadRequest);
+                return Results.Problem($"텍스트 문서는 {MaxReportChars:N0}자 이하여야 합니다", statusCode: StatusCodes.Status400BadRequest);
             }
             if (reportFile is not null && factory.Validate(reportFile) is { } reportError)
             {

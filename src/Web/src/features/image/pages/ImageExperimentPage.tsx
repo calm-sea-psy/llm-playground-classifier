@@ -17,7 +17,7 @@ const POLL_MS = 3000
 const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(1)}%`)
 const sec = (v: number | null) => (v === null ? '—' : `${v.toFixed(1)}초`)
 
-/** X-ray 실험 1건: 조합별 폐렴 판단 정확도(CNN·VLM)·일치율·시간·순위 ➔ [기본으로 적용], 영상별 결과 */
+/** 이미지 실험 1건: 조합별 이진 판단 정확도(CNN·VLM)·일치율·시간·순위 ➔ [기본으로 적용], 영상별 결과 */
 export function ImageExperimentPage() {
   const { experimentId = '' } = useParams()
   return <Detail key={experimentId} id={experimentId} />
@@ -30,7 +30,7 @@ function Cell({ cell, truth }: { cell: ImageDocCell | null; truth: boolean | nul
   }
   // API 가 null 값을 JSON 에서 빼므로(undefined) == null 로 비교
   const mark = (v: boolean | null | undefined) =>
-    v == null ? '—' : truth == null ? (v ? '폐렴' : '음성') : v === truth ? (v ? '폐렴 ✓' : '음성 ✓') : v ? '폐렴 ✗' : '음성 ✗'
+    v == null ? '—' : truth == null ? (v ? '양성' : '음성') : v === truth ? (v ? '양성 ✓' : '음성 ✓') : v ? '양성 ✗' : '음성 ✗'
   const tone = (v: boolean | null | undefined) => (v == null || truth == null ? '' : v === truth ? 'ok-mark' : 'bad-mark')
   return (
     <Link to={`/image/jobs/${cell.jobId}`} className="small">
@@ -123,12 +123,12 @@ function Detail({ id }: { id: string }) {
                 <th>순위</th>
                 <th>조합</th>
                 <th className="num">완료</th>
-                <th className="num" title="CNN 폐렴 판단: 민감도 / 특이도">CNN 민감·특이</th>
+                <th className="num" title="CNN 이진 판단: 민감도 / 특이도">CNN 민감·특이</th>
                 <th className="num">CNN AUC</th>
                 <th className="num" title="VLM 판독 초안이 형식대로 나온 비율">VLM 성공</th>
-                <th className="num" title="VLM 폐렴 의심 판단: 민감도 / 특이도 (판독에 성공한 영상 기준)">VLM 민감·특이</th>
-                <th className="num" title="CNN·VLM 폐렴 판단이 같은 비율 (점수에는 넣지 않음)">일치율</th>
-                <th className="num" title="CNN 이 틀린 영상 중 CNN·VLM 불일치로 사람 확인에 걸린 비율">CNN 오답 적발</th>
+                <th className="num" title="VLM 양성 의심 판단: 민감도 / 특이도 (판독에 성공한 이미지 기준)">VLM 민감·특이</th>
+                <th className="num" title="CNN·VLM 이진 판단이 같은 비율 (점수에는 넣지 않음)">일치율</th>
+                <th className="num" title="CNN 이 틀린 이미지 중 CNN·VLM 불일치로 사람 확인에 걸린 비율">CNN 오답 적발</th>
                 <th className="num">작업 시간</th>
                 <th className="num">점수</th>
                 <th />
@@ -222,7 +222,7 @@ function Detail({ id }: { id: string }) {
                       <span className="muted">—</span>
                     ) : (
                       <>
-                        {d.truth.pneumonia ? '폐렴' : d.truth.normal ? '정상' : '폐렴 아님'}
+                        {d.truth.pneumonia ? '양성' : d.truth.normal ? '정상' : '음성 (이상 있음)'}
                         <span className="muted"> ({d.truth.dataset})</span>
                       </>
                     )}

@@ -1641,3 +1641,36 @@ label.pack-check {
   background: var(--bad-soft);
   border-radius: 6px;
 }
+
+/* 판독 · 통합 화면: 적용 중인 파이프라인 (모델 비교에서 정한 설정, 표시만) */
+.applied-pipeline {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.8rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.applied-pipeline dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.2rem 0.8rem;
+}
+.applied-pipeline dl > div {
+  display: contents;
+}
+.applied-pipeline dt {
+  color: var(--muted);
+}
+.applied-pipeline dd {
+  margin: 0;
+}
+.applied-pipeline p {
+  margin: 0;
+}
+@media (max-width: 600px) {
+  .applied-pipeline dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

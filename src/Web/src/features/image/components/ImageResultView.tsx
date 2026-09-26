@@ -6,7 +6,7 @@ import { isBorderline } from '../labels'
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
 
-/** 소견별 확률 막대 + 판정 기준 표시 (기준을 넘은 소견만 강조) */
+/** 항목별 확률 막대 + 판정 기준 표시 (기준을 넘은 항목만 강조) */
 function FindingBars({ findings }: { findings: CnnFinding[] }) {
   const [showAll, setShowAll] = useState(false)
   const positives = findings.filter((f) => f.positive).length
@@ -33,14 +33,14 @@ function FindingBars({ findings }: { findings: CnnFinding[] }) {
       </ul>
       {findings.length > visible.length || showAll ? (
         <button className="link-button small" onClick={() => setShowAll(!showAll)}>
-          {showAll ? '접기' : `나머지 ${findings.length - visible.length}개 소견 보기`}
+          {showAll ? '접기' : `나머지 ${findings.length - visible.length}개 항목 보기`}
         </button>
       ) : null}
     </>
   )
 }
 
-/** 완료된 작업: 판정 요약 ➔ X-ray + 히트맵 | 폐렴 신호·소견 확률 ➔ VLM 판독 초안 + 교차 검증 */
+/** 완료된 작업: 판정 요약 ➔ 이미지 + 히트맵 | 이진 판단·다중 항목 확률 ➔ VLM 판독 초안 + 교차 검증 */
 export function ImageResultView({ jobId }: { jobId: string }) {
   const [result, setResult] = useState<ImageResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -57,12 +57,12 @@ export function ImageResultView({ jobId }: { jobId: string }) {
     if (result.pneumonia.heatmap) {
       const label = result.pneumonia.heatmap.label
       const positive = result.pneumonia.findings.find((f) => f.label === label)?.positive ?? false
-      out.push({ role: 'pneumonia', title: '폐렴 신호', label, positive, region: result.pneumonia.heatmap.region })
+      out.push({ role: 'pneumonia', title: '이진 판단', label, positive, region: result.pneumonia.heatmap.region })
     }
     if (result.findings.heatmap) {
       const label = result.findings.heatmap.label
       const positive = result.findings.findings.find((f) => f.label === label)?.positive ?? false
-      out.push({ role: 'findings', title: '가장 강한 소견', label, positive, region: result.findings.heatmap.region })
+      out.push({ role: 'findings', title: '가장 강한 항목', label, positive, region: result.findings.heatmap.region })
     }
     return out
   }, [result])
@@ -80,9 +80,9 @@ export function ImageResultView({ jobId }: { jobId: string }) {
       <section className={`card verdict ${result.validationPassed ? 'verdict-ok' : 'verdict-bad'}`}>
         <strong>{result.validationPassed ? 'CNN·VLM 판단 일치' : '사람 확인 필요: CNN 과 VLM 의 판단이 다릅니다'}</strong>
         <span className="small">
-          {POPULATION_NAMES[result.population]} · 폐렴{' '}
+          {POPULATION_NAMES[result.population]} · 이진 판단{' '}
           {result.pneumoniaPositive == null ? '판단 없음' : result.pneumoniaPositive ? '양성' : '음성'}
-          {signal != null && ` (${signal.toFixed(3)})`} · 양성 소견{' '}
+          {signal != null && ` (${signal.toFixed(3)})`} · 양성 항목{' '}
           {result.findings.findings.filter((f) => f.positive).length}개 · CNN {result.cnnElapsedMs}ms
           {result.model && ` · VLM ${result.model} ${(result.llmElapsedMs / 1000).toFixed(1)}초`}
         </span>
@@ -91,7 +91,7 @@ export function ImageResultView({ jobId }: { jobId: string }) {
       <div className="image-result-grid">
         <section className="card panel">
           <header className="panel-head">
-            <h3>X-ray · Grad-CAM</h3>
+            <h3>이미지 · Grad-CAM</h3>
           </header>
           <HeatmapViewer jobId={jobId} width={result.findings.width} height={result.findings.height} layers={layers} />
         </section>
@@ -99,7 +99,7 @@ export function ImageResultView({ jobId }: { jobId: string }) {
         <div className="stack">
           <section className="card panel">
             <header className="panel-head">
-              <h3>폐렴 신호</h3>
+              <h3>CNN 이진 판단</h3>
               <span className="muted small">{sourceName(result.pneumoniaSource)}</span>
             </header>
             {(() => {
@@ -108,23 +108,23 @@ export function ImageResultView({ jobId }: { jobId: string }) {
               return f ? (
                 <FindingBars findings={[f]} />
               ) : (
-                <p className="muted small">폐렴 신호가 없습니다</p>
+                <p className="muted small">이진 판단 결과가 없습니다</p>
               )
             })()}
             <p className="muted small">
               {result.population === 'pediatric'
-                ? '소아: Kaggle 소아 흉부 X-ray 로 파인튜닝한 모델 (소아 AUC 0.98). 성인 영상에는 맞지 않습니다.'
-                : '성인: xrv 의 경화(consolidation) 출력으로 판단 (성인 IU 에서 폐렴성 음영 AUC 0.87). 소아 영상이면 대상을 소아로 올리세요.'}
+                ? '파인튜닝 모델: 테스트 데이터(Kaggle 소아 흉부 X-ray)로 파인튜닝한 이진 분류 (AUC 0.98). 학습 데이터와 성격이 다른 이미지에는 맞지 않습니다.'
+                : '사전학습 모델: xrv 의 경화(consolidation) 출력으로 판단 (테스트 데이터 IU 성인에서 AUC 0.87). 파인튜닝 데이터와 같은 성격의 이미지면 파인튜닝 모델을 고르세요.'}
             </p>
           </section>
 
           <section className="card panel">
             <header className="panel-head">
-              <h3>소견 18종</h3>
+              <h3>CNN 다중 항목 18종</h3>
               <span className="muted small">{result.findings.modelVersion}</span>
             </header>
             <FindingBars findings={result.findings.findings} />
-            <p className="muted small">막대 = 확률, 세로선 = 판정 기준. 기준을 넘은 소견이 강조됩니다.</p>
+            <p className="muted small">막대 = 확률, 세로선 = 판정 기준. 기준을 넘은 항목이 강조됩니다.</p>
           </section>
         </div>
       </div>
@@ -147,9 +147,9 @@ export function ImageResultView({ jobId }: { jobId: string }) {
             <div className="report">
               <p className="impression">{report.impression}</p>
               <div className="chips">
-                <span className={`chip ${report.normal ? 'chip-ok' : 'chip-warn'}`}>{report.normal ? '정상' : '이상 소견'}</span>
+                <span className={`chip ${report.normal ? 'chip-ok' : 'chip-warn'}`}>{report.normal ? '정상' : '이상 있음'}</span>
                 <span className={`chip ${report.pneumonia_suspected ? 'chip-bad' : ''}`}>
-                  {report.pneumonia_suspected ? '폐렴 의심' : '폐렴 의심 아님'}
+                  {report.pneumonia_suspected ? '양성 의심' : '양성 의심 아님'}
                 </span>
               </div>
               <ul>

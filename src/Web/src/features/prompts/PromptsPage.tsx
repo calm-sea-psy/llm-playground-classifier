@@ -265,7 +265,7 @@ function PromptEditor({
       )}
       {info.kind === 'json' && (
         <p className="small muted">
-          용어집 형식: <code>{'{"entries": [{"pattern": "정규식", "text": "정의"}]}'}</code> — 소견서에 pattern 이
+          용어집 형식: <code>{'{"entries": [{"pattern": "정규식", "text": "정의"}]}'}</code> — 문서에 pattern 이
           나오면(대소문자 무시) text 를 요약 지시문 끝에 붙입니다.
         </p>
       )}

@@ -52,7 +52,7 @@ public sealed class ImageModule : IPipelineModule
 
     public void MapEndpoints(RouteGroupBuilder group)
     {
-        // X-ray 업로드 ➔ 202 + jobId. 설정은 DB 의 판독 기본 설정 (모델 비교 실험에서 적용), 대상·모델만 바꿔 보낼 수 있음
+        // 이미지 업로드 ➔ 202 + jobId. 설정은 DB 의 판독 기본 설정 (모델 비교 실험에서 적용). 화면은 그대로 쓰고, population · model 덮어쓰기는 평가 스크립트용
         group.MapPost("/jobs", async (
             IFormFile file,
             [FromForm] string? model,

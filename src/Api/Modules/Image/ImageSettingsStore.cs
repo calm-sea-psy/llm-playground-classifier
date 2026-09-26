@@ -68,6 +68,6 @@ public static class ImageSettingsText
 {
     /// <summary>화면 표시용 한 줄 요약</summary>
     public static string Describe(ImageSettings s) =>
-        $"{s.Model} · {(s.Population == Populations.Pediatric ? "소아" : "성인")}"
+        $"{s.Model} · {(s.Population == Populations.Pediatric ? "파인튜닝 모델" : "사전학습 모델")}"
         + $" · VLM {(!s.VlmReport ? "끔" : s.VlmSeesCnn ? "CNN 참고" : "독립 판독")}";
 }

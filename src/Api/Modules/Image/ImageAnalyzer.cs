@@ -49,11 +49,11 @@ public sealed class ImageAnalyzer(
 
         // 1) CNN: 폐렴 신호 + 18개 소견 (각 장당 약 12ms, 2차-1)
         await reporter.SetStatusAsync(job, JobStatus.CnnRunning,
-            $"CNN 분석 중: 폐렴 신호 ({PopulationName(settings.Population)}, {source})", ct);
+            $"CNN 분석 중: 이진 판단 ({PopulationName(settings.Population)}, {source})", ct);
         var pneumoniaResult = await ClassifyAsync(job, engine, label, PneumoniaRole, ct);
         var pneumonia = pneumoniaResult.Find(label);
         await reporter.SetStatusAsync(job, JobStatus.CnnRunning,
-            $"CNN 분석 중: 소견 ({engines.FindingsEngine}), {PneumoniaLine(pneumonia)}", ct);
+            $"CNN 분석 중: 다중 항목 ({engines.FindingsEngine}), {PneumoniaLine(pneumonia)}", ct);
         var findings = await ClassifyAsync(job, engines.FindingsEngine, target: null, FindingsRole, ct);
 
         // 2) VLM 판독 초안 (기본: CNN 결과를 보여 주지 않고 독립적으로, 2차-3b 실험으로 확인)
@@ -111,7 +111,7 @@ public sealed class ImageAnalyzer(
 
     /// <summary>완료 메시지용 한 줄 요약</summary>
     public static string Describe(ImageAnalysis a) =>
-        $"{PneumoniaLine(a.Pneumonia)}, 소견 양성 {a.Findings.Positives.Count()}개"
+        $"{PneumoniaLine(a.Pneumonia)}, 양성 항목 {a.Findings.Positives.Count()}개"
         + (a.Report is null ? "" : a.Errors == 0 ? ", CNN·VLM 일치" : ", CNN·VLM 불일치 (사람 확인 필요)");
 
     /// <summary>대상별 폐렴 신호 출처 (엔진, 소견) — 2차-1b 비교 결과</summary>
@@ -122,10 +122,10 @@ public sealed class ImageAnalyzer(
 
     public static string HeatmapFile(string role) => $"heatmap_{role}.png";
 
-    private static string PopulationName(string population) => population == Populations.Pediatric ? "소아" : "성인";
+    private static string PopulationName(string population) => population == Populations.Pediatric ? "파인튜닝 모델" : "사전학습 모델";
 
     public static string PneumoniaLine(CnnFinding? p) =>
-        p is null ? "폐렴 신호 없음" : $"폐렴 {(p.Positive ? "양성" : "음성")} {p.Probability:0.000}";
+        p is null ? "이진 판단 없음" : $"이진 판단 {(p.Positive ? "양성" : "음성")} {p.Probability:0.000}";
 
     private async Task<CnnResult> ClassifyAsync(Job job, string engine, string? target, string role, CancellationToken ct)
     {

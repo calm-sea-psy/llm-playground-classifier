@@ -128,12 +128,12 @@ public sealed class MultimodalPipeline(LlmClient llm, MultimodalPrompts prompts,
             if (agree == false)
             {
                 issues.Add(new($"report_vs_cnn:{key}", key == "pneumonia" ? IssueSeverity.Error : IssueSeverity.Warning,
-                    $"{name}: 소견서 {(report == true ? "있음" : "없음")} vs CNN {(finding!.Positive ? "양성" : "음성")} ({finding.Probability:0.00})"));
+                    $"{name}: 문서 {(report == true ? "있음" : "없음")} vs CNN {(finding!.Positive ? "양성" : "음성")} ({finding.Probability:0.00})"));
             }
             if (report is { } rr && vlm is { } v && rr != v)
             {
                 issues.Add(new($"report_vs_vlm:{key}", IssueSeverity.Warning,
-                    $"{name}: 소견서 {(rr ? "있음" : "없음")} vs VLM {(v ? "의심" : "의심 아님")}"));
+                    $"{name}: 문서 {(rr ? "있음" : "없음")} vs VLM {(v ? "의심" : "의심 아님")}"));
             }
         }
         return (rows, issues);
