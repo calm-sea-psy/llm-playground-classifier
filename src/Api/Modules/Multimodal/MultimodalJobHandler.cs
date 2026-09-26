@@ -62,14 +62,14 @@ public sealed class MultimodalJobHandler(
         var (rows, reportIssues) = MultimodalPipeline.Compare(image, summary.Result);
         var disagree = rows.Count(r => r.Agree == false);
         await reporter.SetStatusAsync(job, JobStatus.Validating,
-            $"일치 비교: 소견 {rows.Count(r => r.Agree is not null)}개 중 {disagree}개 불일치", ct);
+            $"일치 비교: 항목 {rows.Count(r => r.Agree is not null)}개 중 {disagree}개 불일치", ct);
 
         // 5) 종합 보고서 (주어진 정보만으로, 불일치는 명시)
         await reporter.SetStatusAsync(job, JobStatus.LlmRunning, $"종합 보고서 작성 중 ({model})", ct);
         var final = await pipeline.SynthesizeAsync(model, image, summary.Result, rows, ct);
 
         // 6) 저장
-        var issues = image.Issues.Select(i => new MultimodalIssue(i.Rule, i.Severity, $"[영상] {i.Message}"))
+        var issues = image.Issues.Select(i => new MultimodalIssue(i.Rule, i.Severity, $"[이미지] {i.Message}"))
             .Concat(reportIssues).ToList();
         if (summary.ParseError is { } se)
         {

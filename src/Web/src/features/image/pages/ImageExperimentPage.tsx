@@ -17,7 +17,7 @@ const POLL_MS = 3000
 const pct = (v: number | null) => (v === null ? '—' : `${(v * 100).toFixed(1)}%`)
 const sec = (v: number | null) => (v === null ? '—' : `${v.toFixed(1)}초`)
 
-/** 이미지 실험 1건: 조합별 이진 판단 정확도(CNN·VLM)·일치율·시간·순위 ➔ [기본으로 적용], 영상별 결과 */
+/** 이미지 실험 1건: 조합별 이진 판단 정확도(CNN·VLM)·일치율·시간·순위 ➔ [기본으로 적용], 이미지별 결과 */
 export function ImageExperimentPage() {
   const { experimentId = '' } = useParams()
   return <Detail key={experimentId} id={experimentId} />
@@ -85,7 +85,7 @@ function Detail({ id }: { id: string }) {
         <h2>{detail.name}</h2>
         {running ? <span className="badge badge-run">진행 중</span> : <span className="badge badge-ok">완료</span>}
         <span className="muted small">
-          {new Date(detail.createdAt).toLocaleString('ko-KR')} · 영상 {detail.docCount}장 × 조합 {detail.combos.length}개
+          {new Date(detail.createdAt).toLocaleString('ko-KR')} · 이미지 {detail.docCount}장 × 조합 {detail.combos.length}개
         </span>
       </div>
       <Disclaimer />
@@ -113,7 +113,7 @@ function Detail({ id }: { id: string }) {
         <h3>조합별 결과</h3>
         {!detail.labeled && (
           <p className="text-warn small">
-            정답을 찾을 수 있는 영상이 없어 정확도·순위를 계산하지 않았습니다 (Kaggle·IU 파일 이름을 그대로 올리세요).
+            정답을 찾을 수 있는 이미지가 없어 정확도·순위를 계산하지 않았습니다 (Kaggle·IU 파일 이름을 그대로 올리세요).
           </p>
         )}
         <div className="table-scroll">
@@ -160,7 +160,7 @@ function Detail({ id }: { id: string }) {
                     </td>
                     <td
                       className={`num tabular small ${c.vlmJudged != null && c.vlmJudged < 10 ? 'muted' : ''}`}
-                      title={`판독에 성공하고 정답이 있는 영상 ${c.vlmJudged ?? '?'}장 기준`}
+                      title={`판독에 성공하고 정답이 있는 이미지 ${c.vlmJudged ?? '?'}장 기준`}
                     >
                       {pct(c.vlmSensitivity)} / {pct(c.vlmSpecificity)}
                       {c.vlmJudged != null && c.vlmJudged < c.labeledDocs && <span className="small"> (n={c.vlmJudged})</span>}
@@ -192,21 +192,21 @@ function Detail({ id }: { id: string }) {
             </tbody>
           </table>
         </div>
-        <RankMargin combos={detail.combos} sample={`영상 ${detail.docCount}장`} />
+        <RankMargin combos={detail.combos} sample={`이미지 ${detail.docCount}장`} unit="이미지" />
         <p className="muted small">
-          점수: {detail.scoreFormula}. 모든 영상이 끝난 조합만 순위를 매깁니다. 시간 통계는 조합별 첫 작업(모델 적재 포함)을 뺀 값입니다.
+          점수: {detail.scoreFormula}. 모든 이미지가 끝난 조합만 순위를 매깁니다. 시간 통계는 조합별 첫 작업(모델 적재 포함)을 뺀 값입니다.
         </p>
         <PromptMixWarning mixes={detail.promptMixes} />
       </section>
 
       <section className="card">
-        <h3>영상별 결과</h3>
+        <h3>이미지별 결과</h3>
         <p className="muted small">✓ = 정답과 같음, ✗ = 틀림. 칸을 누르면 그 작업의 판독 화면으로 이동합니다.</p>
         <div className="table-scroll">
           <table className="jobs doc-matrix">
             <thead>
               <tr>
-                <th>영상</th>
+                <th>이미지</th>
                 <th>정답</th>
                 {detail.combos.map((c) => (
                   <th key={c.index}>조합 {c.index + 1}</th>

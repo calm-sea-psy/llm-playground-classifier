@@ -38,3 +38,6 @@ eval/**/*.log
 
 # 팩 관리 화면이 고치기 전 버전을 남기는 폴더 (이력은 git 으로 관리)
 packs/*/.history/
+
+# DB 수정 전 백업
+data/backup/

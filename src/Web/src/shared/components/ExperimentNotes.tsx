@@ -70,9 +70,12 @@ export function ExperimentDescription({
 export function RankMargin({
   combos,
   sample,
+  unit = '문서',
 }: {
   combos: { rank?: number | null; score?: number | null }[]
   sample: string
+  /** 실험 대상 이름 (문서 · 이미지) */
+  unit?: string
 }) {
   const ranked = combos
     .filter((c) => c.rank != null && c.score != null)
@@ -83,7 +86,7 @@ export function RankMargin({
   return (
     <p className={`rank-margin small ${close ? 'is-close' : ''}`}>
       1위와 2위 점수 차 <strong>{gap.toFixed(3)}</strong> · {sample}
-      {close && ' — 차이가 작아 문서를 바꾸면 순위가 뒤집힐 수 있습니다. 점수보다 아래 지표와 문서별 결과를 함께 보세요.'}
+      {close && ` — 차이가 작아 ${unit}를 바꾸면 순위가 뒤집힐 수 있습니다. 점수보다 아래 지표와 ${unit}별 결과를 함께 보세요.`}
     </p>
   )
 }

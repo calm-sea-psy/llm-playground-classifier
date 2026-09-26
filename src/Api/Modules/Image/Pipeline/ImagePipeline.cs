@@ -113,12 +113,12 @@ public sealed class ImagePipeline(LlmClient llm, ImagePrompts prompts)
         if (vlmNormal && positives.Count > 0)
         {
             issues.Add(new("normal_vs_findings", IssueSeverity.Warning,
-                $"VLM 은 정상으로 판독했지만 CNN 양성 소견이 있음: {string.Join(", ", positives.Select(Describe))}"));
+                $"VLM 은 정상으로 판독했지만 CNN 양성 항목이 있음: {string.Join(", ", positives.Select(Describe))}"));
         }
         else if (!vlmNormal && positives.Count == 0 && cnnPneumonia is { Positive: false })
         {
             issues.Add(new("abnormal_without_findings", IssueSeverity.Warning,
-                "VLM 은 이상 소견을 적었지만 CNN 은 양성 소견이 없음"));
+                "VLM 은 이상이 있다고 적었지만 CNN 은 양성 항목이 없음"));
         }
         return issues;
     }

@@ -50,7 +50,7 @@ public static class ImageExperimentEndpoints
             }
             if (files.Count is 0 or > MaxFiles)
             {
-                return Results.Problem($"영상은 1~{MaxFiles}장이어야 합니다", statusCode: StatusCodes.Status400BadRequest);
+                return Results.Problem($"이미지는 1~{MaxFiles}장이어야 합니다", statusCode: StatusCodes.Status400BadRequest);
             }
             if (comboList is null || comboList.Count is 0 or > MaxCombos)
             {
