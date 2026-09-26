@@ -43,6 +43,19 @@
       }
     },
     {
+      "name": "digitizer-app",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Digitizer.App"
+      ],
+      "port": 5310,
+      "env": {
+        "DIGITIZER_DATA": "data/digitizer-app"
+      }
+    },
+    {
       "name": "cnn",
       "runtimeExecutable": "src/CnnService/.venv/Scripts/uvicorn.exe",
       "runtimeArgs": [

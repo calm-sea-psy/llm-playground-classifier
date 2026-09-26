@@ -31,6 +31,7 @@ data/verify/
 data/monitor/
 data/models/
 data/digitizer/
+data/digitizer-app/
 
 # 평가 결과 (KORIE 라벨 파생 데이터 포함 ➔ 요약은 docs/model_selection.md 로)
 eval/results/

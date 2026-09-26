@@ -16,6 +16,14 @@
     <ProjectReference Include="..\Digitizer.Engine\Digitizer.Engine.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
+  </ItemGroup>
+
   <!--
     합격 표시(type.json 의 "release")가 있는 팩만 출력 · 게시 폴더의 packs\ 로 복사.
     측정하지 않은 팩(상업송장 · 보험 청구서 등)은 빌드 로그에 남기고 넣지 않음. 앱도 시작할 때 release 를 다시 확인
@@ -27,9 +35,7 @@
       <_ReleasedPackDir Include="@(_PackType->'%(RootDir)%(Directory)')" Condition="'%(Released)' == 'True'" />
       <_SkippedPack Include="@(_PackType->'%(PackName)')" Condition="'%(Released)' != 'True'" />
       <_ReleasedPackFile Include="%(_ReleasedPackDir.Identity)type.json;%(_ReleasedPackDir.Identity)*.md" />
-      <Content Include="@(_ReleasedPackFile)"
-               Link="packs\$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))\%(Filename)%(Extension)"
-               CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <Content Include="@(_ReleasedPackFile)" Link="packs\$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
     <Message Importance="high" Text="합격 표시가 없어 exe 에 넣지 않는 팩: @(_SkippedPack, ', ')" Condition="'@(_SkippedPack)' != ''" />
   </Target>

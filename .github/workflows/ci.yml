@@ -28,8 +28,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      # 합격 표시(release)된 팩만 출력에 들어가는지 · 앱이 팩을 읽는지
-      - name: 테스트 (합격한 팩만 포함)
+      # 합격 표시(release)된 팩만 출력에 들어가는지 · 처리 코어 (설정 · SQLite 마이그레이션 · 대기열 · 감시 폴더 · 파일 이동 · 보관 기한, 가짜 OCR · LLM)
+      - name: 테스트 (합격한 팩 · 처리 코어)
         run: dotnet test tests/Digitizer.App.Tests --logger "console;verbosity=normal"
       - name: 게시 (자체 포함 win-x64)
         run: dotnet publish src/Digitizer.App -c Release -r win-x64 --self-contained -o publish
