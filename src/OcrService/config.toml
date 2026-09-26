@@ -29,3 +29,14 @@ use_textline_orientation = false   # 경로 A 와 같은 이유로 끔
 use_table_recognition = true
 use_region_detection = true
 max_pixels = 8_500_000
+
+# CPU 판 (GPU 없는 PC 에서 되는지 측정용, 4차 0단계). 요청 시 로딩: POST /ocr?engine=paddleocr_cpu
+[engines.paddleocr_cpu]
+adapter = "engines.paddle:PaddleEngine"
+lang = "korean"
+device = "cpu"
+enable_mkldnn = false   # paddle 3.4 CPU oneDNN 경로 오류 (NotImplementedError) ➔ 끔
+use_textline_orientation = false
+use_doc_orientation_classify = false
+use_doc_unwarping = false
+max_pixels = 8_500_000

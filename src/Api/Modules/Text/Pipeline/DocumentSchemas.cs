@@ -1,27 +1,7 @@
+using Digitizer.Engine.Rules;
 using System.Text.Json.Nodes;
 
 namespace Api.Modules.Text.Pipeline;
-
-public static class DocumentTypes
-{
-    public const string Receipt = "receipt";
-    public const string CommercialInvoice = "commercial_invoice";
-    public const string InsuranceClaim = "insurance_claim";
-    public const string Other = "other";
-
-    /// <summary>필드를 추출하는 문서 종류 (other 는 분류만)</summary>
-    public static readonly string[] Extractable = [Receipt, CommercialInvoice, InsuranceClaim];
-
-    public static readonly string[] All = [.. Extractable, Other];
-
-    public static string DisplayName(string type) => type switch
-    {
-        Receipt => "영수증",
-        CommercialInvoice => "상업송장",
-        InsuranceClaim => "보험 청구서",
-        _ => "기타",
-    };
-}
 
 /// <summary>
 /// LLM 응답을 강제할 JSON 스키마 (Ollama format / OpenAI response_format).

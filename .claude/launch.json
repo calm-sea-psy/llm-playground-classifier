@@ -4,14 +4,43 @@
     {
       "name": "web",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "src/Web", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "src/Web",
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "api",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "src/Api", "--launch-profile", "http"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "src/Api",
+        "--launch-profile",
+        "http"
+      ],
       "port": 5000
+    },
+    {
+      "name": "ocr",
+      "runtimeExecutable": "src/OcrService/.venv/Scripts/uvicorn.exe",
+      "runtimeArgs": [
+        "main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8001",
+        "--app-dir",
+        "src/OcrService"
+      ],
+      "port": 8001,
+      "env": {
+        "PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK": "True",
+        "PYTHONIOENCODING": "utf-8"
+      }
     }
   ]
 }

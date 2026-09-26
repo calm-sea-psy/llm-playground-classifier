@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
-namespace Api.Modules.Text.Pipeline;
+namespace Digitizer.Engine.Rules;
 
 public enum IssueSeverity
 {
@@ -15,7 +15,7 @@ public enum IssueSeverity
 public sealed record ValidationIssue(string Rule, string? Field, IssueSeverity Severity, string Message);
 
 /// <summary>
-/// ValidateFields: LLM 이 아닌 C# 규칙으로 추출 결과를 검증한다.
+/// ValidateFields: LLM 이 아닌 C# 규칙으로 추출 결과를 검증한다. (4차 통합 A 단계: Api 에서 Engine 으로 내용 그대로 옮김 ➔ 평가 도구 · exe 가 같은 규칙)
 /// KORIE 확인 결과(1단계): 소계는 공급가액이라 "소계 + 세금 = 합계"가 기준이고, 면세 품목이 섞이면 합계가 더 클 수 있다.
 /// </summary>
 public static partial class FieldValidator

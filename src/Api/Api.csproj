@@ -25,4 +25,8 @@
     <PackageReference Include="SkiaSharp" Version="4.152.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Digitizer.Engine\Digitizer.Engine.csproj" />
+  </ItemGroup>
+
 </Project>

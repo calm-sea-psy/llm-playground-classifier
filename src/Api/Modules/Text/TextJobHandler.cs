@@ -1,3 +1,4 @@
+using Digitizer.Engine.Rules;
 using System.Diagnostics;
 using System.Text.Json;
 using Api.Modules.Text.Ocr;

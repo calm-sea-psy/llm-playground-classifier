@@ -1,0 +1,251 @@
+{
+  "id": "resume",
+  "version": "0.2.0",
+  "display_name": "이력서",
+  "description": "입사 지원 이력서의 인적사항 · 학력 · 경력 · 자격증 · 어학 · 기술",
+  "field_types": {
+    "text": "짧은 문자열. 원문에 있어야 함 (공백 무시)",
+    "longtext": "긴 설명 (담당 업무 등). 원문 근거는 핵심 단어로만 확인",
+    "phone": "전화번호. 숫자만 비교",
+    "email": "이메일",
+    "date": "YYYY-MM-DD",
+    "month": "YYYY-MM",
+    "month_or_present": "YYYY-MM 또는 present(재직 중 · 현재)",
+    "list": "여러 건 (key 필드로 항목을 구분, ranged 면 원문의 기간 표기 수와 건수를 대조)",
+    "string_list": "문자열 여러 개"
+  },
+  "fields": [
+    {
+      "name": "name",
+      "label": "이름",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "phone",
+      "label": "휴대전화",
+      "type": "phone"
+    },
+    {
+      "name": "email",
+      "label": "이메일",
+      "type": "email"
+    },
+    {
+      "name": "address",
+      "label": "주소",
+      "type": "text"
+    },
+    {
+      "name": "birth_date",
+      "label": "생년월일",
+      "type": "date"
+    },
+    {
+      "name": "education",
+      "label": "학력",
+      "type": "list",
+      "key": "school",
+      "ranged": true,
+      "items": [
+        {
+          "name": "school",
+          "label": "학교",
+          "type": "text",
+          "required": true,
+          "description": "학교 이름. 대학원이면 \"OO대학교 대학원\" 처럼 대학원까지"
+        },
+        {
+          "name": "major",
+          "label": "전공",
+          "type": "text",
+          "description": "전공. 없거나 \"-\" 면 null"
+        },
+        {
+          "name": "degree",
+          "label": "학위",
+          "type": "text",
+          "description": "학위 · 졸업 구분 (예: 졸업, 학사, 석사, 박사)"
+        },
+        {
+          "name": "start",
+          "label": "입학",
+          "type": "month",
+          "description": "입학 연월. 졸업 연월만 적혀 있으면 null (졸업 연월을 복사하지 않음)"
+        },
+        {
+          "name": "end",
+          "label": "졸업",
+          "type": "month_or_present",
+          "description": "졸업 연월"
+        }
+      ]
+    },
+    {
+      "name": "career",
+      "label": "경력",
+      "type": "list",
+      "key": "company",
+      "ranged": true,
+      "items": [
+        {
+          "name": "company",
+          "label": "회사",
+          "type": "text",
+          "required": true
+        },
+        {
+          "name": "department",
+          "label": "부서",
+          "type": "text"
+        },
+        {
+          "name": "position",
+          "label": "직위",
+          "type": "text"
+        },
+        {
+          "name": "start",
+          "label": "입사",
+          "type": "month",
+          "description": "입사 연월"
+        },
+        {
+          "name": "end",
+          "label": "퇴사",
+          "type": "month_or_present",
+          "description": "퇴사 연월, 재직 중이면 present"
+        },
+        {
+          "name": "duties",
+          "label": "담당 업무",
+          "type": "longtext"
+        }
+      ]
+    },
+    {
+      "name": "certificates",
+      "label": "자격증",
+      "type": "list",
+      "key": "name",
+      "items": [
+        {
+          "name": "name",
+          "label": "자격증",
+          "type": "text",
+          "required": true,
+          "description": "자격증 이름 (어학 시험은 languages 로)"
+        },
+        {
+          "name": "issuer",
+          "label": "발급 기관",
+          "type": "text"
+        },
+        {
+          "name": "date",
+          "label": "취득",
+          "type": "month"
+        }
+      ]
+    },
+    {
+      "name": "languages",
+      "label": "어학",
+      "type": "list",
+      "key": "test",
+      "items": [
+        {
+          "name": "test",
+          "label": "시험",
+          "type": "text",
+          "required": true,
+          "description": "시험 이름만 (예: TOEIC, JLPT, OPIc)"
+        },
+        {
+          "name": "score",
+          "label": "점수 · 등급",
+          "type": "text",
+          "description": "점수 · 급수 · 등급 (예: 850, N2, IH, Level 6)"
+        },
+        {
+          "name": "date",
+          "label": "응시",
+          "type": "month"
+        }
+      ]
+    },
+    {
+      "name": "skills",
+      "label": "기술",
+      "type": "string_list"
+    }
+  ],
+  "forbidden": [
+    {
+      "id": "resident_id",
+      "label": "주민등록번호",
+      "pattern": "\\d{6}\\s*-\\s*[1-4]\\d{6}"
+    },
+    {
+      "id": "family",
+      "label": "가족 사항 (가족의 학력 · 직업 · 재산)"
+    },
+    {
+      "id": "marital_status",
+      "label": "혼인 여부"
+    },
+    {
+      "id": "body",
+      "label": "키 · 체중 등 신체 조건"
+    },
+    {
+      "id": "hometown",
+      "label": "출신 지역 (본적)"
+    }
+  ],
+  "rules": [
+    "date_order",
+    "list_count"
+  ],
+  "excel": {
+    "sheets": [
+      {
+        "name": "인적사항",
+        "fields": [
+          "name",
+          "phone",
+          "email",
+          "address",
+          "birth_date"
+        ]
+      },
+      {
+        "name": "학력",
+        "list": "education"
+      },
+      {
+        "name": "경력",
+        "list": "career"
+      },
+      {
+        "name": "자격증",
+        "list": "certificates"
+      },
+      {
+        "name": "어학",
+        "list": "languages"
+      }
+    ]
+  },
+  "notes": [
+    "수집 금지 항목은 법무 확인 전 후보 (채용절차법상 요구 금지로 알려진 정보 + 주민등록번호). 추출하지 않고, 원문에 있으면 검수 화면에서 가림 표시",
+    "생년월일은 직무 필요성에 따라 빼야 할 수 있음"
+  ],
+  "changelog": [
+    {
+      "version": "0.2.0",
+      "date": "2026-09-26",
+      "changes": "개발 세트 v0.1 측정에서 모호했던 필드에 설명 추가 (시험 이름 · 점수 분리, 대학원 포함, 빈칸 표시, 졸업만 있을 때 입학 null)"
+    }
+  ]
+}

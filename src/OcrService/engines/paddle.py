@@ -20,15 +20,19 @@ class PaddleEngine(OcrEngine):
         use_doc_orientation_classify: bool = False,
         use_doc_unwarping: bool = False,
         max_pixels: int = 8_500_000,
+        enable_mkldnn: bool | None = None,
     ):
         self.name = name
         self.max_pixels = max_pixels
+        # CPU 에서 oneDNN(mkldnn) 경로가 paddle 3.4 에서 NotImplementedError (ConvertPirAttribute2RuntimeAttribute) ➔ CPU 판은 끔
+        extra = {} if enable_mkldnn is None else {"enable_mkldnn": enable_mkldnn}
         self._ocr = PaddleOCR(
             lang=lang,
             device=device,
             use_textline_orientation=use_textline_orientation,
             use_doc_orientation_classify=use_doc_orientation_classify,
             use_doc_unwarping=use_doc_unwarping,
+            **extra,
         )
         det = self._ocr.paddlex_pipeline.text_det_model.model_name
         rec = self._ocr.paddlex_pipeline.text_rec_model.model_name
