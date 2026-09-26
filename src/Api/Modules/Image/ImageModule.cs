@@ -20,7 +20,7 @@ public sealed class ImageModule : IPipelineModule
 
     public string Key => ModuleKey;
 
-    public string DisplayName => "흉부 X-ray 판독";
+    public string DisplayName => "CNN + VLM 판독";
 
     public void ConfigureServices(IServiceCollection services, IConfiguration configuration, IHealthChecksBuilder health)
     {

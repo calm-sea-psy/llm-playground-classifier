@@ -11,7 +11,7 @@ flowchart TB
     subgraph Stack["애플리케이션"]
         direction TB
         subgraph Web["웹 · React + Vite :5173"]
-            Pages["문서 텍스트 추출 · 흉부 X-ray 판독<br/>X-ray + 소견서 통합 · 프롬프트"]
+            Pages["문서 텍스트 추출 · CNN + VLM 판독<br/>CNN + VLM + 텍스트 추출 · 프롬프트"]
         end
 
         subgraph Api["API · ASP.NET Core :5000"]
@@ -68,7 +68,7 @@ flowchart LR
     Vlm --> Revalidate["재검증 후<br/>더 나은 결과"] --> Save
 ```
 
-**흉부 X-ray 판독**과 **X-ray + 소견서 통합**
+**CNN + VLM 판독**과 **CNN + VLM + 텍스트 추출**
 
 ```mermaid
 flowchart LR

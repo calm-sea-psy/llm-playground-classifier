@@ -42,7 +42,7 @@ uv pip install -r requirements.txt
 
 paddlepaddle-gpu는 `requirements.txt` 에 적힌 Paddle 인덱스(cu129)에서 받습니다. OCR 모델 파일은 처음 실행할 때 자동으로 내려받습니다. 엔진 설정은 `src/OcrService/config.toml` 에 있습니다.
 
-### 4. CNN 서비스 (흉부 X-ray 기능을 쓸 때)
+### 4. CNN 서비스 (CNN + VLM 판독 · CNN + VLM + 텍스트 추출을 쓸 때)
 
 torch와 paddle이 충돌하지 않도록 OCR 서비스와 **별도 가상 환경**을 씁니다.
 

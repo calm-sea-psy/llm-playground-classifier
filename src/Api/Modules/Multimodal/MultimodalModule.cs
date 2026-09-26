@@ -24,7 +24,7 @@ public sealed class MultimodalModule : IPipelineModule
 
     public string Key => ModuleKey;
 
-    public string DisplayName => "X-ray + 소견서 통합";
+    public string DisplayName => "CNN + VLM + 텍스트 추출";
 
     public IReadOnlyList<string> DependsOn => ["text", "image"];
 

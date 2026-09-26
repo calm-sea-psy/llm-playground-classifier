@@ -27,7 +27,7 @@
 | `score_ocr.py`, `ocr_variants.py`, `score_aihub.py` | OCR 엔진과 옵션을 비교합니다 (언어, 문서 펴기, 경로 A/B) |
 | `fallback_threshold.py` | VLM 폴백 신뢰도 기준값을 정합니다 |
 | `cnn_eval.py`, `cnn_models.py`, `cnn_models_mm.py` | CNN 후보(사전학습 vs 미세조정)를 AUC, 민감도, 특이도로 비교합니다 |
-| `multimodal_eval.py` | X-ray + 소견서 통합 작업을 모델별로 돌려 소견서 요약 F1, CNN AUC, VLM 정확도, 통합 검출률을 계산합니다 |
+| `multimodal_eval.py` | CNN + VLM + 텍스트 추출 작업을 모델별로 돌려 소견서 요약 F1, CNN AUC, VLM 정확도, 통합 검출률을 계산합니다 |
 | `summary_variants.py` | 소견서 요약 프롬프트 변형(기본 / 용어집 / 예시 / 둘 다, 용어집 새 버전은 `rag@v1`)을 개발 세트와 보류 세트로 비교하고, 바뀐 판단을 목록으로 보여 줍니다 (`--diff`) |
 | `agent_eval.py` | 실험 분석 에이전트 기록(`spikes/AgentSpike run`)을 과제(`eval/agent/`)로 채점합니다. 성공률, 근거 없는 숫자, 반복 호출, 회차 간 일치 ([에이전트 평가](agent_evaluation.md)) |
 

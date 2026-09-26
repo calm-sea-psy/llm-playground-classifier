@@ -1,0 +1,118 @@
+{
+  "type": "object",
+  "properties": {
+    "store_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "business_no": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "time": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "receipt_no": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "qty": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit_price": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "amount": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "qty",
+          "unit_price",
+          "amount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "subtotal": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "tax": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "gross_total": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "total": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "payment_method": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "store_name",
+    "business_no",
+    "date",
+    "time",
+    "receipt_no",
+    "items",
+    "subtotal",
+    "tax",
+    "gross_total",
+    "total",
+    "payment_method"
+  ],
+  "additionalProperties": false
+}

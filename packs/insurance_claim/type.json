@@ -1,0 +1,153 @@
+{
+  "id": "insurance_claim",
+  "version": "1.0.0",
+  "display_name": "보험 청구서",
+  "description": "보험금 청구서 (AI Hub OCR 데이터 금융 2-5. DB손해보험 양식). 평가 도구 Text 모듈 설정을 팩으로 옮김",
+  "generic_checks": false,
+  "variables": {},
+  "fields": [
+    {
+      "name": "insured_name",
+      "label": "피보험자",
+      "type": "text"
+    },
+    {
+      "name": "resident_no",
+      "label": "주민등록번호",
+      "type": "text"
+    },
+    {
+      "name": "company_name",
+      "label": "회사",
+      "type": "text"
+    },
+    {
+      "name": "department",
+      "label": "부서",
+      "type": "text"
+    },
+    {
+      "name": "job_duty",
+      "label": "직무",
+      "type": "text"
+    },
+    {
+      "name": "address",
+      "label": "주소",
+      "type": "text"
+    },
+    {
+      "name": "contact_name",
+      "label": "연락처 이름",
+      "type": "text"
+    },
+    {
+      "name": "contact_relationship",
+      "label": "관계",
+      "type": "text"
+    },
+    {
+      "name": "contact_phone",
+      "label": "연락처",
+      "type": "text"
+    },
+    {
+      "name": "email",
+      "label": "이메일",
+      "type": "text"
+    },
+    {
+      "name": "other_insurers",
+      "label": "다른 보험사",
+      "type": "text_list"
+    },
+    {
+      "name": "accident_datetime",
+      "label": "사고 일시",
+      "type": "text"
+    },
+    {
+      "name": "accident_place",
+      "label": "사고 장소",
+      "type": "text"
+    },
+    {
+      "name": "diagnosis",
+      "label": "진단명",
+      "type": "text"
+    },
+    {
+      "name": "hospital",
+      "label": "병원",
+      "type": "text"
+    },
+    {
+      "name": "injury_part",
+      "label": "다친 부위",
+      "type": "text"
+    },
+    {
+      "name": "bank_name",
+      "label": "은행",
+      "type": "text"
+    },
+    {
+      "name": "account_no",
+      "label": "계좌번호",
+      "type": "text"
+    },
+    {
+      "name": "account_holder",
+      "label": "예금주",
+      "type": "text"
+    },
+    {
+      "name": "written_date",
+      "label": "작성일",
+      "type": "text"
+    },
+    {
+      "name": "claimant_name",
+      "label": "청구인",
+      "type": "text"
+    }
+  ],
+  "forbidden": [],
+  "rules": [
+    "insurance_claim"
+  ],
+  "excel": {
+    "sheets": [
+      {
+        "name": "보험 청구서",
+        "fields": [
+          "insured_name",
+          "resident_no",
+          "company_name",
+          "department",
+          "job_duty",
+          "address",
+          "contact_name",
+          "contact_relationship",
+          "contact_phone",
+          "email",
+          "accident_datetime",
+          "accident_place",
+          "diagnosis",
+          "hospital",
+          "injury_part",
+          "bank_name",
+          "account_no",
+          "account_holder",
+          "written_date",
+          "claimant_name"
+        ]
+      }
+    ]
+  },
+  "notes": [
+    "generic_checks=false: 기존과 같게 보험 청구서 규칙만 (합성 데이터라 날짜 · 번호 형식만 느슨하게)",
+    "AI Hub 양식은 금액 칸이 없고 날짜가 합성값(\"0825년\")이라 모두 원문 문자열",
+    "주민등록번호를 추출하는 양식 (평가 데이터 그대로). 실제 운영 전에 수집 금지 여부 확인 필요"
+  ]
+}

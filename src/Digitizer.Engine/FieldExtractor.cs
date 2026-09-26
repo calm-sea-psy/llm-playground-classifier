@@ -93,6 +93,8 @@ public sealed class FieldExtractor(HttpClient ollamaHttp, LlmOptions options)
                 ["items"] = Object(f.Items ?? []),
             },
             "string_list" => new JsonObject { ["type"] = "array", ["description"] = f.Label, ["items"] = new JsonObject { ["type"] = "string" } },
+            // 칸마다 빈 값(null)이 올 수 있는 문자열 목록 (보험 청구서 다른 보험사 칸, 평가 도구 DocumentSchemas 와 같음)
+            "text_list" => new JsonObject { ["type"] = "array", ["description"] = f.Label, ["items"] = new JsonObject { ["type"] = new JsonArray("string", "null") } },
             // 영수증: 금액은 원 단위 정수, 수량은 소수 가능 (평가 도구 DocumentSchemas 와 같은 타입)
             "amount" => new JsonObject { ["type"] = new JsonArray("integer", "null"), ["description"] = Describe(f) },
             "number" => new JsonObject { ["type"] = new JsonArray("number", "null"), ["description"] = Describe(f) },

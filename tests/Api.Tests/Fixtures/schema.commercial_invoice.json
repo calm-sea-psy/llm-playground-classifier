@@ -1,0 +1,84 @@
+{
+  "type": "object",
+  "properties": {
+    "invoice_no": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "invoice_date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "seller": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "buyer": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "currency": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit_price": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "amount": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "description",
+          "qty",
+          "unit_price",
+          "amount"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "total_amount": {
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "invoice_no",
+    "invoice_date",
+    "seller",
+    "buyer",
+    "currency",
+    "items",
+    "total_amount"
+  ],
+  "additionalProperties": false
+}

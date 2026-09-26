@@ -4,6 +4,6 @@ import { MultimodalRoutes } from './MultimodalRoutes'
 /** Step 3 통합: 흉부 X-ray + 소견서 ➔ 영상 분석 + 소견서 요약 ➔ 일치 비교 ➔ 환자 종합 보고서 */
 export const multimodalFeature: FeatureModule = {
   key: 'multimodal',
-  title: 'X-ray + 소견서 통합',
+  title: 'CNN + VLM + 텍스트 추출',
   element: <MultimodalRoutes />,
 }

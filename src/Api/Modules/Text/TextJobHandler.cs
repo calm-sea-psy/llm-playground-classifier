@@ -57,7 +57,7 @@ public sealed class TextJobHandler(
         {
             await reporter.SetStatusAsync(job, JobStatus.LlmRunning,
                 $"LLM 구조화 중: 필드 추출 ({DocumentTypes.DisplayName(documentType)}, {model})", ct);
-            textAttempt = await pipeline.ExtractFieldsAsync(model, documentType, document, null, null, settings.AmountsAsString, ct, settings.Extraction);
+            textAttempt = await pipeline.ExtractFieldsAsync(model, documentType, document, null, null, ct);
             attempts.Add(textAttempt);
             await reporter.SetStatusAsync(job, JobStatus.Validating, $"검증: {Summary(textAttempt)}", ct);
         }
@@ -81,7 +81,7 @@ public sealed class TextJobHandler(
         {
             await reporter.SetStatusAsync(job, JobStatus.LlmRunning, $"VLM 폴백 추출 중 ({fallbackReason})", ct);
             var vlmAttempt = await pipeline.ExtractFieldsAsync(
-                model, documentType, document, VlmImage(), textAttempt?.Issues, settings.AmountsAsString, ct, settings.Extraction);
+                model, documentType, document, VlmImage(), textAttempt?.Issues, ct);
             attempts.Add(vlmAttempt);
             await reporter.SetStatusAsync(job, JobStatus.Validating, $"재검증: {Summary(vlmAttempt)}", ct);
         }

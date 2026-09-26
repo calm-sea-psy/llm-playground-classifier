@@ -62,7 +62,7 @@ export function MultimodalHomePage() {
       <Disclaimer />
       <form className="card upload-card" onSubmit={submit}>
         <div>
-          <h2>X-ray + 소견서 통합</h2>
+          <h2>CNN + VLM + 텍스트 추출</h2>
           <p className="muted small">
             흉부 X-ray 분석(CNN·VLM) 과 소견서 요약(LLM) 을 소견별로 맞춰 보고, 두 결과를 묶어 환자 종합 보고서를 만듭니다.
             소견서와 자동 분석이 어긋나면 표시합니다.
@@ -123,7 +123,7 @@ export function MultimodalHomePage() {
 
         <div className="upload-actions">
           <span className="muted small">
-            영상 분석 설정은 <Link to="/image">X-ray 판독 기본 설정</Link>을 따릅니다
+            영상 분석 설정은 <Link to="/image">CNN + VLM 판독 기본 설정</Link>을 따릅니다
             {model && (
               <>
                 {' '}· LLM <strong>{model}</strong> (VLM 판독 · 소견서 요약 · 종합 보고서 공통)

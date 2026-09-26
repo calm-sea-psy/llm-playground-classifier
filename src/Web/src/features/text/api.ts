@@ -89,12 +89,7 @@ export interface PipelineSettings {
   unloadBeforeOcr: UnloadPolicy
   fallbackConfidence: number
   vlmFallback: boolean
-  amountsAsString: boolean
-  /** legacy = 기존 Text 모듈, engine = Digitizer.Engine + 문서 종류 팩 (KORIE 150장에서 결과 같음) */
-  extraction: Extraction
 }
-
-export type Extraction = 'legacy' | 'engine'
 
 export interface SettingsDto {
   settings: PipelineSettings
@@ -107,7 +102,6 @@ export interface SettingsOptions {
   models: string[]
   ocrEngines: string[]
   unloadPolicies: UnloadPolicy[]
-  extractions: Extraction[]
 }
 
 export interface ComboResult {
@@ -207,13 +201,11 @@ export const createExperiment = (name: string, files: File[], combos: PipelineSe
 export const summarize = (s: PipelineSettings) =>
   `${s.model} · ${s.ocrEngine === 'ppstructure' ? '경로 B' : '경로 A'} · LLM 내리기 ${s.unloadBeforeOcr} · 폴백 ${
     s.vlmFallback ? `<${s.fallbackConfidence.toFixed(2)}` : '끔'
-  }${s.amountsAsString ? ' · 금액 문자열' : ''}${s.extraction === 'engine' ? ' · Engine' : ''}`
+  }`
 
 export const sameSettings = (a: PipelineSettings, b: PipelineSettings) =>
   a.model === b.model &&
   a.ocrEngine === b.ocrEngine &&
   a.unloadBeforeOcr === b.unloadBeforeOcr &&
   a.fallbackConfidence === b.fallbackConfidence &&
-  a.vlmFallback === b.vlmFallback &&
-  a.amountsAsString === b.amountsAsString &&
-  (a.extraction ?? 'legacy') === (b.extraction ?? 'legacy')
+  a.vlmFallback === b.vlmFallback

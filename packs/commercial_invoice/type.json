@@ -1,0 +1,97 @@
+{
+  "id": "commercial_invoice",
+  "version": "1.0.0",
+  "display_name": "상업송장",
+  "description": "상업송장 (AI Hub OCR 데이터 물류 1.상업송장). 평가 도구 Text 모듈 설정을 팩으로 옮김",
+  "generic_checks": false,
+  "variables": {
+    "amount_rule": "Amounts are plain numbers without thousands separators or currency symbols (e.g. \"1,234.50\" → 1234.50)."
+  },
+  "fields": [
+    {
+      "name": "invoice_no",
+      "label": "송장 번호",
+      "type": "text"
+    },
+    {
+      "name": "invoice_date",
+      "label": "송장 날짜",
+      "type": "date"
+    },
+    {
+      "name": "seller",
+      "label": "판매자",
+      "type": "text"
+    },
+    {
+      "name": "buyer",
+      "label": "구매자",
+      "type": "text"
+    },
+    {
+      "name": "currency",
+      "label": "통화",
+      "type": "text"
+    },
+    {
+      "name": "items",
+      "label": "품목",
+      "type": "list",
+      "key": "description",
+      "items": [
+        {
+          "name": "description",
+          "label": "품목 설명",
+          "type": "text"
+        },
+        {
+          "name": "qty",
+          "label": "수량",
+          "type": "number"
+        },
+        {
+          "name": "unit_price",
+          "label": "단가",
+          "type": "number"
+        },
+        {
+          "name": "amount",
+          "label": "금액",
+          "type": "number"
+        }
+      ]
+    },
+    {
+      "name": "total_amount",
+      "label": "합계",
+      "type": "number"
+    }
+  ],
+  "forbidden": [],
+  "rules": [
+    "commercial_invoice"
+  ],
+  "excel": {
+    "sheets": [
+      {
+        "name": "상업송장",
+        "fields": [
+          "invoice_no",
+          "invoice_date",
+          "seller",
+          "buyer",
+          "currency",
+          "total_amount"
+        ]
+      },
+      {
+        "name": "품목",
+        "list": "items"
+      }
+    ]
+  },
+  "notes": [
+    "generic_checks=false: 기존과 같게 상업송장 규칙만 (AI Hub 합성 데이터라 산술 규칙은 경고)",
+    "금액은 소수가 있어 number (영수증 amount 는 원 단위 정수)"
+  ]
+}

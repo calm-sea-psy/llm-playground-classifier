@@ -16,13 +16,9 @@ public sealed class PipelineOptions
 {
     /// <summary>OCR 평균 신뢰도가 이 값보다 낮으면 VLM 폴백</summary>
     public double FallbackConfidence { get; set; } = 0.6;
-    /// <summary>금액을 문자열로 받는 스키마 사용 여부 (DocumentSchemas.For 참고)</summary>
-    public bool AmountsAsString { get; set; }
     public int VlmMaxImageSide { get; set; } = 1600;
     /// <summary>분류에는 앞부분만 사용 (문서 종류는 머리말로 충분히 구분됨)</summary>
     public int ClassifyMaxChars { get; set; } = 1500;
-    /// <summary>DB 기본 설정이 없을 때의 추출 방식 (ExtractionModes)</summary>
-    public string Extraction { get; set; } = ExtractionModes.Legacy;
     /// <summary>문서 종류 팩 폴더 (ContentRoot 기준)</summary>
     public string PacksRoot { get; set; } = "../../packs";
 }
@@ -49,8 +45,7 @@ public sealed record ExtractionAttempt(
     JsonObject? Fields,
     List<ValidationIssue> Issues,
     string Raw,
-    /// <summary>Engine 으로 추출했으면 "팩@버전" (예: receipt@1.0.0), legacy 면 null. 결과만으로는 경로를 구분할 수 없어 기록
-    /// (4차 통합 C: temperature 0 에서 두 경로의 응답이 150장 모두 글자까지 같았음)</summary>
+    /// <summary>추출에 쓴 문서 종류 팩 "팩@버전" (예: receipt@1.0.0). 4차 통합 전 기록은 null (기존 추출)</summary>
     string? Engine = null)
 {
     public const string Text = "text";
@@ -80,8 +75,7 @@ public sealed class TextPipeline(
     IOptions<PipelineOptions> options,
     PackStore packs,
     IHttpClientFactory httpFactory,
-    IOptions<LlmOptions> llmOptions,
-    ILogger<TextPipeline> logger)
+    IOptions<LlmOptions> llmOptions)
 {
     /// <summary>Engine 이 Ollama 를 부를 HttpClient 이름 (TextModule 에서 등록)</summary>
     public const string EngineHttpClient = "digitizer-engine-ollama";
@@ -112,21 +106,25 @@ public sealed class TextPipeline(
         }
     }
 
+    /// <summary>
+    /// 필드 추출: 문서 종류 팩(packs/{종류}) + Digitizer.Engine (평가 도구 · exe 가 같은 엔진).
+    /// 지시문 · 사용자 메시지는 프롬프트 관리 화면의 적용 버전으로 렌더링 (파일 기본값의 원본은 팩).
+    /// 4차 통합: 기존(legacy) 추출은 KORIE 150장 · AI Hub 상업송장 · 보험 청구서 30장씩에서 결과가 같음을 확인하고 삭제
+    /// </summary>
     /// <param name="image">null 이면 OCR 텍스트만으로 추출, 있으면 VLM 폴백 (이미지 + OCR 텍스트)</param>
     /// <param name="previousIssues">폴백 때 텍스트 추출에서 발견된 문제를 힌트로 전달</param>
-    /// <param name="extraction">ExtractionModes. engine 이면 Digitizer.Engine + 팩 (팩이 없거나 금액 문자열 스키마면 legacy)</param>
     public async Task<ExtractionAttempt> ExtractFieldsAsync(
         string model,
         string documentType,
         DocumentText document,
         LlmImage? image,
         IReadOnlyList<ValidationIssue>? previousIssues,
-        bool amountsAsString,
-        CancellationToken ct,
-        string extraction = ExtractionModes.Legacy)
+        CancellationToken ct)
     {
+        var pack = packs.Get(documentType)
+            ?? throw new InvalidOperationException($"문서 종류 팩이 없습니다: {Path.Combine(packs.Root, documentType)}");
         var system = await prompts.RenderForModelAsync($"extract.{documentType}", model,
-            new() { ["amount_rule"] = AmountRule(documentType, amountsAsString) }, ct);
+            new(pack.Variables.ToDictionary(v => v.Key, v => (object?)v.Value)), ct);
         var user = await prompts.RenderAsync(image is null ? "extract.user" : "extract.vlm.user", new()
         {
             ["ocr_text"] = document.Text,
@@ -140,73 +138,6 @@ public sealed class TextPipeline(
                 : "",
         }, ct);
 
-        if (extraction == ExtractionModes.Engine)
-        {
-            if (!amountsAsString && packs.Get(documentType) is { } pack)
-            {
-                return await ExtractWithEngineAsync(pack, model, documentType, document, image, system, user, ct);
-            }
-            // 조용히 legacy 로 가면 측정에서 구분이 안 됨 ➔ 경고 (시도 기록의 Engine 도 null 로 남음)
-            logger.LogWarning("engine 추출을 요청했지만 {DocumentType} 팩이 없거나(폴더 {Root}) 금액 문자열 스키마라 legacy 로 처리",
-                documentType, packs.Root);
-        }
-
-        var response = await llm.CompleteJsonAsync(
-            new LlmRequest(model, system, user, DocumentSchemas.For(documentType, amountsAsString), image is null ? null : [image]),
-            ct);
-
-        var source = image is null ? ExtractionAttempt.Text : ExtractionAttempt.Vlm;
-        JsonObject? fields;
-        string? parseError = null;
-        try
-        {
-            fields = JsonNode.Parse(response.Content) as JsonObject;
-            if (fields is null)
-            {
-                parseError = "JSON 객체가 아닙니다";
-            }
-            else
-            {
-                var required = DocumentSchemas.For(documentType, amountsAsString)["required"]!.AsArray().Select(n => n!.GetValue<string>());
-                var missing = required.Where(k => !fields.ContainsKey(k)).ToList();
-                if (missing.Count > 0)
-                {
-                    parseError = $"필드 누락: {string.Join(", ", missing)}";
-                }
-            }
-        }
-        catch (JsonException ex)
-        {
-            fields = null;
-            parseError = response.Truncated
-                ? $"응답이 최대 길이({response.CompletionTokens} 토큰)에서 잘림 (같은 내용 반복 생성 의심)"
-                : $"JSON 파싱 실패: {ex.Message}";
-        }
-
-        // 수량 보정(영수증: 금액 = 단가인데 수량이 7 같은 값 ➔ 1)은 검증 전에 적용하고 경고로 남김
-        List<ValidationIssue> issues = fields is null ? []
-            : [
-                .. FieldValidator.CorrectQuantities(documentType, fields),
-                .. FieldValidator.Validate(documentType, fields),
-                // 근거 확인은 텍스트 추출만 (VLM 은 이미지를 직접 봄)
-                .. image is null ? FieldValidator.CheckGrounded(documentType, fields, document.Text) : [],
-            ];
-        if (fields is not null)
-        {
-            NormalizeAmounts(documentType, fields);
-        }
-        return new ExtractionAttempt(source, model, response.ElapsedMs, response.PromptTokens, response.CompletionTokens,
-            SchemaValid: parseError is null, parseError, fields, issues, response.Content);
-    }
-
-    /// <summary>
-    /// 4차 통합 C: 같은 지시문 · 사용자 메시지(프롬프트 관리 화면의 적용 버전으로 렌더링)를 Engine 으로 추출하고 팩 규칙으로 검증.
-    /// legacy 와 다른 것은 LLM 호출 경로(OllamaSharp)와 검증 코드 경로뿐 ➔ KORIE 150장 재측정으로 비교
-    /// </summary>
-    private async Task<ExtractionAttempt> ExtractWithEngineAsync(
-        DocumentType pack, string model, string documentType, DocumentText document, LlmImage? image,
-        string system, string user, CancellationToken ct)
-    {
         var o = llmOptions.Value;
         var extractor = new FieldExtractor(httpFactory.CreateClient(EngineHttpClient),
             new EngineLlmOptions(model, o.ContextLength, o.KeepAlive, MaxOutputTokens: o.MaxOutputTokens));
@@ -217,55 +148,13 @@ public sealed class TextPipeline(
         var parseError = result.Error;
         if (fields is not null)
         {
-            var required = DocumentSchemas.For(documentType, amountsAsString: false)["required"]!.AsArray().Select(n => n!.GetValue<string>());
-            var missing = required.Where(k => !fields.ContainsKey(k)).ToList();
+            var missing = pack.Fields.Select(f => f.Name).Where(k => !fields.ContainsKey(k)).ToList();
             if (missing.Count > 0) parseError = $"필드 누락: {string.Join(", ", missing)}";
         }
-        // 보정 ➔ 영수증 규칙 ➔ 근거 확인(텍스트 추출만) 을 팩 rules 로 (legacy 와 같은 순서, ReceiptPackTests)
+        // 팩 rules: 보정(영수증 수량) ➔ 종류별 규칙 ➔ 근거 확인(텍스트 추출만, VLM 은 이미지를 직접 봄)
         var issues = fields is null ? [] : Validator.Validate(pack, fields, document.Text, fromImage: image is not null);
         return new ExtractionAttempt(image is null ? ExtractionAttempt.Text : ExtractionAttempt.Vlm, model, (int)result.ElapsedMs,
             (int?)result.InputTokens, (int?)result.OutputTokens, SchemaValid: parseError is null, parseError, fields, issues, result.Raw,
             Engine: $"{pack.Id}@{pack.Version}");
-    }
-
-    /// <summary>영수증 팩(packs/receipt) 의 amount_rule 변수와 같아야 함 (ReceiptPackTests)</summary>
-    public static string AmountRule(string documentType, bool asString) => (documentType, asString) switch
-    {
-        (DocumentTypes.CommercialInvoice, false) =>
-            "Amounts are plain numbers without thousands separators or currency symbols (e.g. \"1,234.50\" → 1234.50).",
-        (DocumentTypes.CommercialInvoice, true) =>
-            "Amounts are strings containing only the number, without thousands separators or currency symbols (e.g. \"1,234.50\" → \"1234.50\").",
-        (_, false) => "금액은 원 단위 정수로, 쉼표·'원'·통화 기호를 뺍니다 (예: \"12,850원\" → 12850).",
-        (_, true) => "금액은 숫자만 담은 문자열로, 쉼표·'원'·통화 기호를 뺍니다 (예: \"12,850원\" → \"12850\").",
-    };
-
-    /// <summary>문자열 금액("12850")을 숫자로 바꿔 저장 형식을 통일 (검증은 두 형식 모두 처리)</summary>
-    private static void NormalizeAmounts(string documentType, JsonObject fields)
-    {
-        var topLevel = documentType == DocumentTypes.Receipt ? DocumentSchemas.ReceiptAmountFields
-            : documentType == DocumentTypes.CommercialInvoice ? DocumentSchemas.InvoiceAmountFields
-            : [];
-        foreach (var key in topLevel)
-        {
-            ToNumber(fields, key);
-        }
-        if (fields["items"] is JsonArray items && topLevel.Length > 0)
-        {
-            foreach (var item in items.OfType<JsonObject>())
-            {
-                foreach (var key in DocumentSchemas.ItemAmountFields)
-                {
-                    ToNumber(item, key);
-                }
-            }
-        }
-    }
-
-    private static void ToNumber(JsonObject obj, string key)
-    {
-        if (obj[key] is JsonValue v && v.TryGetValue<string>(out _) && FieldValidator.Amount(v) is { } number)
-        {
-            obj[key] = number;
-        }
     }
 }

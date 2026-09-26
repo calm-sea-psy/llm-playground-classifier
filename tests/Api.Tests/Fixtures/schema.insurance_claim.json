@@ -1,0 +1,158 @@
+{
+  "type": "object",
+  "properties": {
+    "insured_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "resident_no": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "company_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "department": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "job_duty": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "address": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contact_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contact_relationship": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "contact_phone": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "email": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "other_insurers": {
+      "type": "array",
+      "items": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "accident_datetime": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "accident_place": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "diagnosis": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "hospital": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "injury_part": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "bank_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "account_no": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "account_holder": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "written_date": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "claimant_name": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "insured_name",
+    "resident_no",
+    "company_name",
+    "department",
+    "job_duty",
+    "address",
+    "contact_name",
+    "contact_relationship",
+    "contact_phone",
+    "email",
+    "other_insurers",
+    "accident_datetime",
+    "accident_place",
+    "diagnosis",
+    "hospital",
+    "injury_part",
+    "bank_name",
+    "account_no",
+    "account_holder",
+    "written_date",
+    "claimant_name"
+  ],
+  "additionalProperties": false
+}
