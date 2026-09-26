@@ -22,7 +22,8 @@ public sealed record AgentTrace(
     double ElapsedSec,
     int ReasoningFallbacks,
     int LengthCutoffs,
-    string? Error);
+    string? Error,
+    System.Text.Json.Nodes.JsonObject? Extra = null);
 
 /// <summary>
 /// 직접 만든 도구 호출 루프 (MEAI FunctionInvokingChatClient). 4단계에서 Agent Framework ChatClientAgent 와 비교할 기준.

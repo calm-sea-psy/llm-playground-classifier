@@ -22,7 +22,7 @@ from collections import defaultdict
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-TASKS = REPO / "eval" / "agent" / "tasks.json"
+TASKS = REPO / "eval" / "agent" / "tasks.json"  # --tasks 로 보류 세트(tasks_holdout.json) 지정
 RESULTS = REPO / "eval" / "results" / "agent"
 
 NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
@@ -104,9 +104,10 @@ def pct(n: int, d: int) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", required=True, help="eval/results/agent/{run}.jsonl")
+    ap.add_argument("--tasks", default=str(TASKS), help="과제 파일 (기본 개발 세트)")
     args = ap.parse_args()
 
-    tasks = {t["id"]: t for t in json.loads(TASKS.read_text(encoding="utf-8"))["tasks"]}
+    tasks = {t["id"]: t for t in json.loads(Path(args.tasks).read_text(encoding="utf-8"))["tasks"]}
     path = RESULTS / f"{args.run}.jsonl"
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 

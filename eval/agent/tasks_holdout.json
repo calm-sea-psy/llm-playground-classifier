@@ -1,0 +1,361 @@
+{
+  "version": 1,
+  "created": "2026-09-26",
+  "note": "3차-2 0단계: 워크플로 에이전트 보류 세트 15개. 라우터·실행기를 만들기 전에 작성, 4단계 측정 전까지 이 과제로 돌리거나 고치지 않음 (개발 세트 tasks.json 30개만 보고 개발). 새 표현 · 스파이크에서 안 쓴 실험·조합·지표 · 조합 두 개를 한 번에 묻기 · '없다'가 정답인 근거 확인 포함. 채점 규칙은 tasks.json 과 같음",
+  "tasks": [
+    {
+      "id": "H01",
+      "type": "single",
+      "intent": "list_experiments",
+      "question": "문서 추출 실험 중에서 문서 수가 가장 많은 실험의 이름과 문서 수를 알려줘",
+      "required_tools": [
+        [
+          "list_experiments"
+        ]
+      ],
+      "answer_all": [
+        [
+          "폴백 신뢰도"
+        ],
+        [
+          "43\\s*장",
+          "43\\s*개",
+          "43\\s*건",
+          "43\\s*문서"
+        ]
+      ],
+      "truth": "폴백 신뢰도 기준 0.6 vs 0.9 실험, 43장"
+    },
+    {
+      "id": "H02",
+      "type": "single",
+      "intent": "experiment_summary",
+      "question": "소아 Kaggle 30장 X-ray 실험에서 gemma4 두 조합의 점수는 각각 얼마였어?",
+      "required_tools": [
+        [
+          "get_experiment",
+          "list_experiments"
+        ]
+      ],
+      "answer_all": [
+        [
+          "0\\.864",
+          "0\\.86\\b"
+        ]
+      ],
+      "answer_none": [
+        "0\\.52\\b",
+        "0\\.485"
+      ],
+      "truth": "01a0d59b-20df: 0번 gemma4 독립 0.864, 1번 gemma4 CNN 참고 0.864 (같음)"
+    },
+    {
+      "id": "H03",
+      "type": "single",
+      "intent": "job_detail",
+      "question": "작업 01a0d2ae-13b0-71ad-922a-b1a799d560ba 에는 어떤 검증 경고가 붙었어?",
+      "required_tools": [
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "품목"
+        ],
+        [
+          "23,?900"
+        ],
+        [
+          "28,?900"
+        ]
+      ],
+      "truth": "Warning items_sum: 품목 금액 합 23,900 ≠ 합계 28,900"
+    },
+    {
+      "id": "H04",
+      "type": "single",
+      "intent": "prompt_info",
+      "question": "흉부 X-ray(image) 모듈에는 어떤 프롬프트들이 있어?",
+      "required_tools": [
+        [
+          "get_prompt"
+        ]
+      ],
+      "answer_all": [
+        [
+          "report\\.system"
+        ],
+        [
+          "report\\.user"
+        ]
+      ],
+      "truth": "report.system, report.user"
+    },
+    {
+      "id": "H05",
+      "type": "single",
+      "intent": "grounding_check",
+      "question": "작업 01a0d27c-0784-7180-9f34-357fdbf8f672 에서 뽑은 거래 날짜가 영수증 OCR 원문에 실제로 찍혀 있는지 봐줘",
+      "required_tools": [
+        [
+          "find_in_ocr",
+          "get_ocr_text"
+        ]
+      ],
+      "answer_all": [
+        [
+          "2023-11-02",
+          "2023\\.11\\.02",
+          "11월\\s*2일"
+        ],
+        [
+          "있",
+          "존재",
+          "확인되",
+          "찍혀"
+        ]
+      ],
+      "answer_none": [
+        "없습니다",
+        "존재하지 않",
+        "찾을 수 없"
+      ],
+      "truth": "추출 날짜 2023-11-02, 원문 26·69줄에 2023.11.02 있음"
+    },
+    {
+      "id": "H06",
+      "type": "multi",
+      "intent": "doc_query",
+      "question": "폴백 신뢰도 기준 실험의 1번 조합에서 VLM 폴백까지 간 문서는 몇 장이야?",
+      "required_tools": [
+        [
+          "list_experiment_docs",
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "42\\s*장",
+          "42\\s*개",
+          "42\\s*건"
+        ]
+      ],
+      "truth": "42장 (43장 중 1장은 작업 실패)"
+    },
+    {
+      "id": "H07",
+      "type": "multi",
+      "intent": "doc_query",
+      "question": "영수증 2장 실험에서 두 조합 각각 검증에 실패한 문서와 그 이유를 알려줘",
+      "required_tools": [
+        [
+          "list_experiment_docs"
+        ],
+        [
+          "get_extraction_result"
+        ]
+      ],
+      "answer_all": [
+        [
+          "IMG00012"
+        ],
+        [
+          "사업자",
+          "체크섬"
+        ]
+      ],
+      "answer_none": [
+        "IMG00007[^\\n]{0,30}실패"
+      ],
+      "truth": "두 조합 모두 IMG00012, 사업자등록번호 체크섬 오류 (8880-21-0)"
+    },
+    {
+      "id": "H08",
+      "type": "multi",
+      "intent": "doc_query",
+      "question": "소견별 기준값 적용 후 gemma4 독립 vs CNN 참고 실험에서 CNN과 VLM 판단이 엇갈린 X-ray는 조합별로 몇 장이야?",
+      "required_tools": [
+        [
+          "list_experiment_docs",
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "3\\s*장",
+          "3\\s*개",
+          "3\\s*건"
+        ],
+        [
+          "2\\s*장",
+          "2\\s*개",
+          "2\\s*건"
+        ]
+      ],
+      "truth": "01a0d7b3: 0번(독립) 3장, 1번(CNN 참고) 2장"
+    },
+    {
+      "id": "H09",
+      "type": "multi",
+      "intent": "experiment_summary",
+      "question": "성인 IU 30장 X-ray 실험에서 VLM 판독 성공률이 100%가 안 되는 조합을 모두 성공률과 함께 알려줘",
+      "required_tools": [
+        [
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "0\\.207",
+          "20\\.7",
+          "21\\s*%"
+        ],
+        [
+          "0\\.172",
+          "17\\.2",
+          "17\\s*%"
+        ]
+      ],
+      "truth": "01a0d59b-2361: 2번 qwen3-vl:8b 독립 0.207, 3번 qwen3-vl:8b CNN 참고 0.172"
+    },
+    {
+      "id": "H10",
+      "type": "multi",
+      "intent": "compare_combos",
+      "question": "폴백 신뢰도 기준 실험에서 합계 일치 비율은 어느 조합이 몇 %p 더 높아?",
+      "allow_derived": true,
+      "required_tools": [
+        [
+          "get_experiment"
+        ]
+      ],
+      "answer_all": [
+        [
+          "1\\s*번",
+          "0\\.90",
+          "0\\.9\\b"
+        ],
+        [
+          "7\\.7",
+          "0\\.077",
+          "7\\.8"
+        ]
+      ],
+      "truth": "1번 조합(폴백 <0.90) 0.821 vs 0번 0.744 ➔ 7.7%p (반올림 값끼리 빼면 7.7, 원값 차 7.7)"
+    },
+    {
+      "id": "H11",
+      "type": "multi",
+      "intent": "doc_query",
+      "question": "폴백 신뢰도 기준 실험 0번 조합에서 검증은 통과했지만 틀린 문서 중 두 번째 문서의 날짜와 합계가 OCR 원문에 있는지 각각 확인해줘",
+      "required_tools": [
+        [
+          "list_experiment_docs"
+        ],
+        [
+          "find_in_ocr",
+          "get_ocr_text"
+        ]
+      ],
+      "answer_all": [
+        [
+          "IMG00692"
+        ],
+        [
+          "28,?900"
+        ],
+        [
+          "2024-11-07",
+          "2024\\.11\\.07",
+          "11월\\s*7일"
+        ],
+        [
+          "없",
+          "찾을 수 없",
+          "존재하지 않"
+        ]
+      ],
+      "truth": "두 번째 문서 IMG00692: 합계 28900 있음(58줄), 날짜 2024-11-07 은 원문에 없음 (근거 확인 규칙 이전 작업이라 통과했던 것)"
+    },
+    {
+      "id": "H12",
+      "type": "none",
+      "intent": "unsupported",
+      "question": "다음 달에 새 gemma 모델이 나오면 이 실험 점수가 오를까?",
+      "answer_all": [
+        [
+          "알 수 없",
+          "예측할 수 없",
+          "예측하기 어렵",
+          "확인할 수 없",
+          "없습니다"
+        ]
+      ],
+      "answer_none": [
+        "0\\.\\d{2,}\\s*(점|정도|으로)",
+        "오를 것입니다"
+      ],
+      "truth": "알 수 없음"
+    },
+    {
+      "id": "H13",
+      "type": "none",
+      "intent": "unsupported",
+      "question": "폴백 기준을 0.8로 바꿔서 영수증 실험을 다시 돌려줘",
+      "answer_all": [
+        [
+          "할 수 없",
+          "없습니다",
+          "지원하지 않",
+          "직접",
+          "화면"
+        ]
+      ],
+      "answer_none": [
+        "돌렸습니다",
+        "시작했습니다",
+        "실행했습니다",
+        "변경했습니다"
+      ],
+      "truth": "실험 실행·설정 변경은 하지 않음 ➔ 화면 안내"
+    },
+    {
+      "id": "H14",
+      "type": "error",
+      "intent": "experiment_summary",
+      "question": "실험 12345 의 결과를 요약해줘",
+      "answer_all": [
+        [
+          "찾을 수 없",
+          "없습니다",
+          "존재하지 않"
+        ]
+      ],
+      "answer_none": [
+        "0\\.\\d{3}"
+      ],
+      "truth": "없는 실험"
+    },
+    {
+      "id": "H15",
+      "type": "error",
+      "intent": "experiment_summary",
+      "question": "폴백 신뢰도 기준 실험에서 CNN 폐렴 AUC는 얼마야?",
+      "answer_all": [
+        [
+          "없",
+          "지원하지 않",
+          "문서 추출",
+          "X-ray",
+          "image",
+          "해당하지 않"
+        ]
+      ],
+      "answer_none": [
+        "0\\.9[0-9]"
+      ],
+      "truth": "문서 추출 실험이라 CNN AUC 가 없음"
+    }
+  ]
+}

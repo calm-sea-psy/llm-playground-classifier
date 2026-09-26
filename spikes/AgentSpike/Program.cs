@@ -43,6 +43,11 @@ switch (args.FirstOrDefault())
         Console.WriteLine($"오류: get_extraction_result(X-ray 작업)\n{await tools.GetExtractionResult("01a0d7b7-cbdc-774d-83b9-9786f4727ea4")}");
         break;
 
+    case "find":
+        // find <작업 id> <값>: 정답 작성용, find_in_ocr 를 LLM 없이
+        Console.WriteLine(await tools.FindInOcr(args[1], args[2]));
+        break;
+
     case "truth":
         await Truth.RunAsync(tools);
         break;
@@ -59,10 +64,36 @@ switch (args.FirstOrDefault())
         string Opt(string name, string fallback) =>
             args.SkipWhile(a => a != name).Skip(1).FirstOrDefault() ?? fallback;
         await Runner.RunAsync(
-            new SpikeAgent(ollama, tools), new AfAgent(ollama, tools), args[1], args[2],
+            new Dictionary<string, IAgentRunner>
+            {
+                ["direct"] = new SpikeAgent(ollama, tools),
+                ["af"] = new AfAgent(ollama, tools),
+                ["wf"] = new AgentSpike.Workflow.AnalysisWorkflow(ollama, tools),
+            },
+            args[1], args[2],
             Opt("--configs", "gemma4:12b").Split(','),
             int.Parse(Opt("--reps", "1")),
             args.Contains("--only") ? Opt("--only", "").Split(',') : null);
+        break;
+
+    case "route":
+        // route <질문> [모델]: 3차-2 라우터 한 번
+        var (route, raw, sec, err) = await new AgentSpike.Workflow.Router(ollama).RouteAsync(args.ElementAtOrDefault(2) ?? "gemma4:12b", args[1]);
+        Console.WriteLine($"{sec}초 {err}\n{raw}");
+        break;
+
+    case "route-eval":
+        // route-eval <tasks> <out.jsonl> --configs a,b --reps 3
+        await AgentSpike.Workflow.RouteEval.RunAsync(new AgentSpike.Workflow.Router(ollama), args[1], args[2],
+            (args.SkipWhile(a => a != "--configs").Skip(1).FirstOrDefault() ?? "gemma4:12b").Split(","),
+            int.Parse(args.SkipWhile(a => a != "--reps").Skip(1).FirstOrDefault() ?? "1"));
+        break;
+
+    case "wf":
+        // wf <질문> [모델]: 3차-2 워크플로 한 번
+        var wfTrace = await new AgentSpike.Workflow.AnalysisWorkflow(ollama, tools).RunAsync(args.ElementAtOrDefault(2) ?? "gemma4:12b", args[1]);
+        SpikeAgent.Print(wfTrace);
+        Console.WriteLine($"  부가: {wfTrace.Extra?.ToJsonString(ApiTools.Json)}");
         break;
 
     case "approve":

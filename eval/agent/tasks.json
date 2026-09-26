@@ -7,12 +7,14 @@
     "answer_all": "그룹마다 정규식 대안 중 하나 이상이 답에 있어야 함 (대소문자 무시)",
     "answer_none": "하나라도 답에 있으면 실패",
     "no_tools": "true 면 도구를 하나도 부르지 않아야 성공",
-    "allow_derived": "true 면 계산을 요구하는 과제라 근거 없는 숫자 검사를 하지 않음"
+    "allow_derived": "true 면 계산을 요구하는 과제라 근거 없는 숫자 검사를 하지 않음",
+    "intent": "3차-2 워크플로 라우터의 정답 의도 (배열이면 그중 하나면 정답)"
   },
   "tasks": [
     {
       "id": "S01",
       "type": "single",
+      "intent": "list_experiments",
       "question": "문서 추출(text) 모델 비교 실험은 모두 몇 개 있어?",
       "required_tools": [
         [
@@ -30,6 +32,7 @@
     {
       "id": "S02",
       "type": "single",
+      "intent": "experiment_summary",
       "question": "실험 01a0d2ae-1357-750d-8b25-f082ff40c9bb 에서 점수 1위 조합의 설정 요약과 점수를 알려줘",
       "required_tools": [
         [
@@ -52,6 +55,7 @@
     {
       "id": "S03",
       "type": "single",
+      "intent": "experiment_summary",
       "question": "실험 01a0d27c-077c-7765-a0f5-887320a56dd5 에서 폴백을 끈 조합의 작업 시간 중앙값은 몇 초야?",
       "required_tools": [
         [
@@ -71,6 +75,7 @@
     {
       "id": "S04",
       "type": "single",
+      "intent": "job_detail",
       "question": "작업 01a0d27c-0784-7180-9f34-357fdbf8f672 에서 추출된 합계와 상호명을 알려줘",
       "required_tools": [
         [
@@ -90,6 +95,7 @@
     {
       "id": "S05",
       "type": "single",
+      "intent": "job_detail",
       "question": "작업 01a0d2ae-141d-758d-bb00-0a232f71945f 는 왜 검증에 실패했어?",
       "required_tools": [
         [
@@ -112,6 +118,7 @@
     {
       "id": "S06",
       "type": "single",
+      "intent": "job_detail",
       "question": "작업 01a0d27c-0784-7180-9f34-357fdbf8f672 의 OCR 평균 신뢰도는 얼마야?",
       "required_tools": [
         [
@@ -130,6 +137,7 @@
     {
       "id": "S07",
       "type": "single",
+      "intent": "prompt_info",
       "question": "text 모듈의 classify.system 프롬프트는 문서를 어떤 종류들로 분류하게 되어 있어?",
       "required_tools": [
         [
@@ -155,6 +163,7 @@
     {
       "id": "S08",
       "type": "single",
+      "intent": "prompt_info",
       "question": "multimodal 모듈의 summarize.glossary 프롬프트는 지금 몇 번 버전이 적용돼 있고, 저장된 버전은 모두 몇 개야?",
       "required_tools": [
         [
@@ -166,17 +175,19 @@
           "v\\s*2",
           "2\\s*번",
           "버전\\s*2",
-          "active_version\\D{0,5}2"
+          "active_version\\D{0,5}2",
+          "2\\s*버전"
         ],
         [
           "2\\s*개"
         ]
       ],
-      "truth": "적용 v2, 버전 2개"
+      "truth": "적용 v2, 버전 2개 (\"2 버전\" 표현 인정, 3차-2 smoke 후 수정)"
     },
     {
       "id": "S09",
       "type": "single",
+      "intent": "experiment_summary",
       "question": "X-ray 실험 01a0d7b3-3bf1-70f0-b3d7-9e5a2a26cfe4 에서 CNN 폐렴 AUC는 얼마야?",
       "required_tools": [
         [
@@ -195,6 +206,7 @@
     {
       "id": "S10",
       "type": "single",
+      "intent": "grounding_check",
       "question": "작업 01a0d27c-0784-7180-9f34-357fdbf8f672 의 OCR 원문에 사업자번호 213-81-52063 이 실제로 있어?",
       "required_tools": [
         [
@@ -220,6 +232,7 @@
     {
       "id": "M01",
       "type": "multi",
+      "intent": "doc_query",
       "question": "폴백 신뢰도 기준 실험에서 0번 조합 기준으로 검증은 통과했지만 필드가 틀린 문서는 몇 장이야? 그중 첫 번째 문서의 추출된 합계가 OCR 원문에 실제로 있는지도 확인해줘",
       "required_tools": [
         [
@@ -256,6 +269,7 @@
     {
       "id": "M02",
       "type": "multi",
+      "intent": "doc_query",
       "question": "폴백 신뢰도 기준 실험의 1번 조합에서 실패한 문서(검증 실패 포함)의 파일 이름과 각각의 실패 이유를 알려줘",
       "required_tools": [
         [
@@ -291,6 +305,7 @@
     {
       "id": "M03",
       "type": "multi",
+      "intent": "experiment_summary",
       "question": "성인 IU 30장 VLM 모델 × CNN 참고 X-ray 실험에서 VLM 판독 성공률이 가장 낮은 조합은 무엇이고, 그 성공률은 얼마야?",
       "required_tools": [
         [
@@ -317,6 +332,7 @@
     {
       "id": "M04",
       "type": "multi",
+      "intent": "doc_query",
       "question": "소아 Kaggle 29장 qwen3-vl instruct 재비교 실험에서 0번 조합 기준으로 CNN이 틀린 X-ray 파일 이름을 모두 알려줘",
       "required_tools": [
         [
@@ -342,6 +358,7 @@
     {
       "id": "M05",
       "type": "multi",
+      "intent": "doc_query",
       "question": "가장 최근에 만든 X-ray 실험에서 CNN과 VLM의 폐렴 판단이 엇갈린 문서가 조합별로 몇 장씩이야?",
       "required_tools": [
         [
@@ -369,6 +386,7 @@
     {
       "id": "M06",
       "type": "multi",
+      "intent": "doc_query",
       "question": "영수증 2장 실험에서 VLM 폴백을 쓴 문서가 있으면 파일 이름, 폴백 이유, 폴백 후 최종 결과가 텍스트와 VLM 중 어느 쪽으로 정해졌는지 알려줘",
       "required_tools": [
         [
@@ -400,6 +418,7 @@
     {
       "id": "M07",
       "type": "multi",
+      "intent": "compare_combos",
       "question": "폴백 신뢰도 기준 실험에서 두 조합의 필드 정확도 차이는 몇 %p야?",
       "allow_derived": true,
       "required_tools": [
@@ -422,6 +441,7 @@
     {
       "id": "M08",
       "type": "multi",
+      "intent": "grounding_check",
       "question": "작업 01a0d2ae-141d-758d-bb00-0a232f71945f 에서 추출한 날짜와 합계가 OCR 원문에 각각 있는지 확인해줘",
       "required_tools": [
         [
@@ -452,6 +472,7 @@
     {
       "id": "M09",
       "type": "multi",
+      "intent": "doc_query",
       "question": "폴백 신뢰도 기준 실험 0번 조합에서 VLM 폴백을 쓴 문서들의 파일 이름과 폴백 이유를 알려줘",
       "required_tools": [
         [
@@ -480,6 +501,7 @@
     {
       "id": "M10",
       "type": "multi",
+      "intent": "prompt_info",
       "question": "text 모듈에 qwen3-vl 전용 영수증 추출 프롬프트가 따로 있어? 있으면 이름을 알려주고, 기본 영수증 추출 프롬프트와 다른 점을 하나만 알려줘",
       "required_tools": [
         [
@@ -499,6 +521,7 @@
     {
       "id": "N01",
       "type": "none",
+      "intent": "unsupported",
       "question": "내일 새로 돌릴 실험의 점수는 얼마로 나올까?",
       "answer_all": [
         [
@@ -518,6 +541,7 @@
     {
       "id": "N02",
       "type": "none",
+      "intent": "unsupported",
       "question": "KORIE 150장 전체 평가에서 qwen3-vl 이 지어낸 금액은 몇 건이었어?",
       "answer_all": [
         [
@@ -537,6 +561,7 @@
     {
       "id": "N03",
       "type": "none",
+      "intent": "unsupported",
       "question": "안녕? 너는 어떤 걸 도와줄 수 있어?",
       "no_tools": true,
       "answer_all": [
@@ -551,6 +576,10 @@
     {
       "id": "N04",
       "type": "none",
+      "intent": [
+        "list_experiments",
+        "unsupported"
+      ],
       "question": "X-ray + 소견서 통합(multimodal) 모듈의 모델 비교 실험 목록을 보여줘",
       "answer_all": [
         [
@@ -571,6 +600,7 @@
     {
       "id": "N05",
       "type": "none",
+      "intent": "unsupported",
       "question": "폴백 신뢰도 기준 실험에서 1번 조합을 문서 처리 기본 설정으로 적용해줘",
       "answer_all": [
         [
@@ -593,6 +623,7 @@
     {
       "id": "E01",
       "type": "error",
+      "intent": "experiment_summary",
       "question": "실험 01a0d2ae-0000-0000-0000-000000000000 의 1위 조합과 점수를 알려줘",
       "required_tools": [
         [
@@ -615,6 +646,7 @@
     {
       "id": "E02",
       "type": "error",
+      "intent": "job_detail",
       "question": "작업 01a0d7b7-cbdc-774d-83b9-9786f4727ea4 에서 추출된 합계는 얼마야?",
       "required_tools": [
         [
@@ -639,6 +671,7 @@
     {
       "id": "E03",
       "type": "error",
+      "intent": "doc_query",
       "question": "폴백 신뢰도 기준 실험의 5번 조합 문서 목록을 보여줘",
       "required_tools": [
         [
@@ -664,6 +697,7 @@
     {
       "id": "E04",
       "type": "error",
+      "intent": "doc_query",
       "question": "영수증 2장 실험에서 CNN이 틀린 문서를 알려줘",
       "answer_all": [
         [
@@ -684,6 +718,7 @@
     {
       "id": "E05",
       "type": "error",
+      "intent": "job_detail",
       "question": "작업 abc 의 OCR 결과를 보여줘",
       "answer_all": [
         [

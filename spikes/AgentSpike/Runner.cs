@@ -9,17 +9,20 @@ namespace AgentSpike;
 /// </summary>
 public static class Runner
 {
-    /// <summary>"모델", "모델+think", 끝에 "@af" 면 Agent Framework (예: gemma4:12b+think@af)</summary>
-    public static (string Model, bool Think, bool Af) ParseConfig(string config)
+    /// <summary>"모델", "모델+think", 끝에 "@af" 면 Agent Framework 에이전트, "@wf" 면 3차-2 워크플로 (예: gemma4:12b@wf)</summary>
+    public static (string Model, bool Think, string Kind) ParseConfig(string config)
     {
-        var af = config.EndsWith("@af");
-        if (af) config = config[..^"@af".Length];
+        var kind = "direct";
+        foreach (var k in new[] { "af", "wf" })
+        {
+            if (config.EndsWith("@" + k)) { kind = k; config = config[..^(k.Length + 1)]; }
+        }
         var think = config.EndsWith("+think");
         if (think) config = config[..^"+think".Length];
-        return (config, think, af);
+        return (config, think, kind);
     }
 
-    public static async Task RunAsync(IAgentRunner direct, IAgentRunner af, string tasksPath, string outPath, string[] configs, int reps, string[]? only)
+    public static async Task RunAsync(IReadOnlyDictionary<string, IAgentRunner> agents, string tasksPath, string outPath, string[] configs, int reps, string[]? only)
     {
         var tasks = JsonNode.Parse(await File.ReadAllTextAsync(tasksPath))!["tasks"]!.AsArray()
             .Where(t => only is null || only.Contains(t!["id"]!.GetValue<string>()))
@@ -41,8 +44,8 @@ public static class Runner
         var count = 0;
         foreach (var config in configs)
         {
-            var (model, think, useAf) = ParseConfig(config);
-            var agent = useAf ? af : direct;
+            var (model, think, kind) = ParseConfig(config);
+            var agent = agents[kind];
             for (var rep = 1; rep <= reps; rep++)
             {
                 foreach (var task in tasks)
