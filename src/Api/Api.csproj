@@ -10,6 +10,9 @@
     <!-- 프롬프트는 재빌드 없이 고쳐 볼 수 있도록 파일로 두고 출력 폴더에 복사 -->
     <None Update="Modules\**\Prompts\*.md" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Modules\**\Prompts\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 영수증 지시문의 원본은 문서 종류 팩 하나 (평가 도구 · exe 가 같은 파일). 출력 폴더에는 기존 이름으로 복사해 프롬프트 관리 화면 · 버전은 그대로 -->
+    <None Include="..\..\packs\receipt\prompt.md" Link="Modules\Text\Pipeline\Prompts\extract.receipt.md" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\packs\receipt\prompt.qwen3-vl.md" Link="Modules\Text\Pipeline\Prompts\extract.receipt.qwen3-vl.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Api.Modules.Text.Pipeline;
+using Api.Shared.Prompts;
 using Digitizer.Engine;
 using Digitizer.Engine.Rules;
 
@@ -14,6 +15,8 @@ public class ReceiptPackTests
     private static readonly string Repo = FindRepo();
     private static readonly DocumentType Pack = DocumentType.Load(Path.Combine(Repo, "packs", "receipt"));
     private static readonly string PromptDir = Path.Combine(Repo, "src", "Api", "Modules", "Text", "Pipeline", "Prompts");
+    /// <summary>API 가 실행 때 읽는 프롬프트 폴더 (빌드 결과물). 영수증 지시문은 여기에 팩 파일이 기존 이름으로 복사됨</summary>
+    private static readonly string OutputPromptDir = PromptStore.PromptsDirectory("text");
 
     [Fact]
     public void 스키마가_기존과_같다()
@@ -25,12 +28,21 @@ public class ReceiptPackTests
             $"팩 스키마\n{StripDescriptions(engine).ToJsonString()}\n기존 스키마\n{StripDescriptions(legacy).ToJsonString()}");
     }
 
+    /// <summary>영수증 지시문은 팩이 원본 하나: 소스 폴더에는 없고, 빌드 때 팩 파일이 기존 이름으로 출력 폴더에 들어감</summary>
     [Theory]
     [InlineData("prompt.md", "extract.receipt.md")]
     [InlineData("prompt.qwen3-vl.md", "extract.receipt.qwen3-vl.md")]
+    public void 영수증_지시문은_팩이_원본이다(string packFile, string apiFile)
+    {
+        Assert.False(File.Exists(Path.Combine(PromptDir, apiFile)), $"{apiFile} 이 소스 폴더에 다시 생겼습니다 (원본은 packs/receipt/{packFile})");
+        Assert.Equal(Read(Path.Combine(Repo, "packs", "receipt", packFile)), Read(Path.Combine(OutputPromptDir, apiFile)));
+    }
+
+    /// <summary>원문 전달 틀은 상업송장 · 보험 청구서도 같이 쓰는 공용 파일이라 API 에 남기고 팩은 복사본 ➔ 같은지 확인</summary>
+    [Theory]
     [InlineData("user.md", "extract.user.md")]
     [InlineData("vlm.user.md", "extract.vlm.user.md")]
-    public void 프롬프트_파일이_기존과_같다(string packFile, string apiFile) =>
+    public void 원문_전달_틀은_공용_파일과_같다(string packFile, string apiFile) =>
         Assert.Equal(Read(Path.Combine(PromptDir, apiFile)), Read(Path.Combine(Repo, "packs", "receipt", packFile)));
 
     [Theory]
@@ -38,7 +50,7 @@ public class ReceiptPackTests
     [InlineData("qwen3-vl:8b-instruct", "extract.receipt.qwen3-vl.md")]
     public void 지시문은_모델_계열별_파일에_금액_규칙을_넣는다(string model, string apiFile)
     {
-        var expected = Read(Path.Combine(PromptDir, apiFile))
+        var expected = Read(Path.Combine(OutputPromptDir, apiFile))
             .Replace("{{$amount_rule}}", TextPipeline.AmountRule(DocumentTypes.Receipt, asString: false));
         Assert.Equal(expected, Pack.SystemPromptFor(model).Replace("\r\n", "\n"));
     }

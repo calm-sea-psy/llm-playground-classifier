@@ -55,7 +55,8 @@ public sealed record SettingsDto(PipelineSettings Settings, string Summary, stri
 public sealed record SettingsOptionsDto(
     IReadOnlyList<string> Models,
     IReadOnlyList<string> OcrEngines,
-    IReadOnlyList<string> UnloadPolicies);
+    IReadOnlyList<string> UnloadPolicies,
+    IReadOnlyList<string> Extractions);
 
 public sealed class SettingsStore(
     AppDbContext db,
@@ -65,7 +66,7 @@ public sealed class SettingsStore(
     IOptions<Pipeline.PipelineOptions> pipelineOptions,
     TimeProvider clock)
 {
-    public SettingsOptionsDto Options() => new(llm.Models, Engines, Enum.GetNames<UnloadPolicy>());
+    public SettingsOptionsDto Options() => new(llm.Models, Engines, Enum.GetNames<UnloadPolicy>(), ExtractionModes.All);
 
     private List<string> Engines => ocrOptions.Value.Engines.Count > 0 ? ocrOptions.Value.Engines : [ocrOptions.Value.Engine];
 

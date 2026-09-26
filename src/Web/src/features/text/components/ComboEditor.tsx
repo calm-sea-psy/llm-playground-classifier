@@ -1,8 +1,12 @@
-import type { PipelineSettings, SettingsOptions, UnloadPolicy } from '../api'
+import type { Extraction, PipelineSettings, SettingsOptions, UnloadPolicy } from '../api'
 
 const OCR_LABEL: Record<string, string> = {
   paddleocr: '경로 A · PP-OCR 줄 텍스트',
   ppstructure: '경로 B · PP-StructureV3 표 구조',
+}
+const EXTRACTION_LABEL: Record<Extraction, string> = {
+  legacy: '기존 (Text 모듈)',
+  engine: 'Engine + 문서 종류 팩',
 }
 const UNLOAD_LABEL: Record<UnloadPolicy, string> = {
   Never: '유지 (내리지 않음)',
@@ -20,7 +24,7 @@ interface Props {
   disabled?: boolean
 }
 
-/** 실험 조합 한 줄: 모델·OCR 경로·LLM 내리기·폴백·금액 스키마 */
+/** 실험 조합 한 줄: 모델·OCR 경로·LLM 내리기·폴백·금액 스키마·추출 방식 */
 export function ComboEditor({ index, value, options, onChange, onRemove, isDefault, disabled }: Props) {
   const set = <K extends keyof PipelineSettings>(key: K, v: PipelineSettings[K]) => onChange({ ...value, [key]: v })
 
@@ -74,9 +78,24 @@ export function ComboEditor({ index, value, options, onChange, onRemove, isDefau
           onChange={(e) => set('fallbackConfidence', Number(e.target.value))}
         />
       </label>
+      <label>
+        <span title="engine: 평가 도구와 exe 가 같이 쓰는 Digitizer.Engine 으로 추출 · 검증 (packs/ 의 문서 종류 팩)">추출 방식</span>
+        <select value={value.extraction ?? 'legacy'} onChange={(e) => set('extraction', e.target.value as Extraction)}>
+          {(options.extractions ?? ['legacy']).map((x) => (
+            <option key={x} value={x}>
+              {EXTRACTION_LABEL[x] ?? x}
+            </option>
+          ))}
+        </select>
+      </label>
       <label className="check">
-        <input type="checkbox" checked={value.amountsAsString} onChange={(e) => set('amountsAsString', e.target.checked)} />
-        <span>금액을 문자열로 받기</span>
+        <input
+          type="checkbox"
+          checked={value.amountsAsString}
+          disabled={value.extraction === 'engine'}
+          onChange={(e) => set('amountsAsString', e.target.checked)}
+        />
+        <span title={value.extraction === 'engine' ? 'Engine 추출은 금액 문자열 스키마를 지원하지 않음' : undefined}>금액을 문자열로 받기</span>
       </label>
       {onRemove && (
         <button type="button" className="link-button small combo-remove" onClick={onRemove}>
