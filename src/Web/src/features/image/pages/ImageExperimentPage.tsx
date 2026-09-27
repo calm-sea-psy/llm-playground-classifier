@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { useBusy } from '../../../shared/busy/busyContext'
 import { ExperimentDescription, RankMargin } from '../../../shared/components/ExperimentNotes'
 import { PromptMixWarning } from '../../../shared/components/PromptsUsed'
 import {
@@ -44,6 +45,7 @@ function Cell({ cell, truth }: { cell: ImageDocCell | null; truth: boolean | nul
 }
 
 function Detail({ id }: { id: string }) {
+  const busy = useBusy()
   const [detail, setDetail] = useState<ImageExperimentDetail | null>(null)
   const [current, setCurrent] = useState<ImageSettingsDto | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -180,7 +182,7 @@ function Detail({ id }: { id: string }) {
                         <button
                           className={isBest ? 'primary small-button' : 'small-button'}
                           disabled={c.completed === 0}
-                          onClick={async () => setCurrent(await applyImageCombo(detail.id, c.index))}
+                          onClick={async () => setCurrent(await busy.run('기본 설정에 적용하는 중', () => applyImageCombo(detail.id, c.index)))}
                         >
                           기본으로 적용
                         </button>

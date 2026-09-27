@@ -1737,3 +1737,69 @@ label.pack-check {
 .release-commands code {
   user-select: all;
 }
+
+/* 처리 중 레이어 팝업 (shared/busy/BusyProvider): 화면 전체를 어둡게 덮고 가운데에 진행 상황, 뒤 화면은 inert */
+.busy-host {
+  display: contents;
+}
+.busy-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(10, 14, 22, 0.55);
+  backdrop-filter: blur(1px);
+  cursor: progress;
+}
+.busy-card {
+  width: min(34rem, 100%);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  padding: 1.1rem 1.25rem;
+  cursor: default;
+}
+.busy-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.05rem;
+}
+.busy-card p {
+  margin: 0.5rem 0 0;
+}
+.busy-spinner {
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  border: 3px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: busy-spin 0.8s linear infinite;
+  flex: none;
+}
+@keyframes busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .busy-spinner {
+    animation-duration: 2.4s;
+  }
+}
+.busy-log {
+  margin: 0.6rem 0 0;
+  max-height: 12rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.75rem;
+  background: var(--surface-2);
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+}

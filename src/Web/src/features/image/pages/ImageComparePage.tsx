@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useBusy } from '../../../shared/busy/busyContext'
 import { MultiDropzone } from '../../../shared/components/MultiDropzone'
 import { SystemSpecs } from '../../../shared/components/SystemSpecs'
 import {
@@ -32,6 +33,7 @@ const SEC_PER_JOB = 7
  */
 export function ImageComparePage() {
   const navigate = useNavigate()
+  const busy = useBusy()
   const [options, setOptions] = useState<ImageSettingsOptions | null>(null)
   const [current, setCurrent] = useState<ImageSettingsDto | null>(null)
   const [experiments, setExperiments] = useState<ImageExperimentSummary[]>([])
@@ -88,7 +90,11 @@ export function ImageComparePage() {
     setSubmitting(true)
     setError(null)
     try {
-      const created = await createImageExperiment(name.trim(), files, combos, description.trim())
+      // 영상 올리기 · 작업 만들기가 끝날 때까지 (실험 자체는 대기열에서 계속 돌고 실험 화면이 진행을 보여 줌)
+      const created = await busy.run('실험 시작 중', (update) => {
+        update({ detail: `영상 ${files.length}장 × 조합 ${combos.length}개 올리고 작업 ${files.length * combos.length}건 만드는 중` })
+        return createImageExperiment(name.trim(), files, combos, description.trim())
+      })
       navigate(`/image/experiments/${created.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -96,13 +102,16 @@ export function ImageComparePage() {
     }
   }
 
-  const apply = async (experimentId: string, index: number) => setCurrent(await applyImageCombo(experimentId, index))
+  const apply = async (experimentId: string, index: number) =>
+    setCurrent(await busy.run('기본 설정에 적용하는 중', () => applyImageCombo(experimentId, index)))
 
   const remove = async (id: string) => {
     if (!confirm('이 실험 기록을 삭제할까요? (처리된 작업은 판독 기록에 남습니다)')) return
     try {
-      await deleteImageExperiment(id)
-      await reload()
+      await busy.run('실험 기록 삭제하는 중', async () => {
+        await deleteImageExperiment(id)
+        await reload()
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }

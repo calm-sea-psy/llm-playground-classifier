@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { listJobs } from '../../../shared/api/jobs'
 import { isFinished, type JobDto } from '../../../shared/api/types'
 import { StatusBadge } from '../../../shared/components/StatusBadge'
+import { useBusy, waitForJob } from '../../../shared/busy/busyContext'
 import { UploadDropzone } from '../../../shared/components/UploadDropzone'
 import { createImageJob, getImageSettings, type ImageSettingsDto } from '../api'
 import { AppliedPipeline } from '../components/AppliedPipeline'
@@ -14,6 +15,7 @@ const REFRESH_MS = 3000
 /** 이미지 업로드 + 최근 작업 */
 export function ImageHomePage() {
   const navigate = useNavigate()
+  const busy = useBusy()
   const [settings, setSettings] = useState<ImageSettingsDto | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -42,8 +44,13 @@ export function ImageHomePage() {
     setSubmitting(true)
     setError(null)
     try {
-      const job = await createImageJob(file)
-      navigate(`/image/jobs/${job.jobId}`)
+      // 판독이 끝날 때까지 처리 중 레이어 (작업 화면으로 먼저 옮기고, 끝나면 결과가 보임)
+      await busy.run('이미지 판독 중', async (update) => {
+        update({ detail: `${file.name} 올리는 중` })
+        const job = await createImageJob(file)
+        navigate(`/image/jobs/${job.jobId}`)
+        await waitForJob(job.jobId, (text) => update({ detail: text }))
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setSubmitting(false)

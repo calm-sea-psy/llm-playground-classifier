@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useBusy } from '../../../shared/busy/busyContext'
 import { MultiDropzone } from '../../../shared/components/MultiDropzone'
 import {
   applyCombo,
@@ -31,6 +32,7 @@ const SEC_PER_JOB = 15
  */
 export function ComparePage() {
   const navigate = useNavigate()
+  const busy = useBusy()
   const [options, setOptions] = useState<SettingsOptions | null>(null)
   const [current, setCurrent] = useState<SettingsDto | null>(null)
   const [experiments, setExperiments] = useState<ExperimentSummary[]>([])
@@ -89,7 +91,11 @@ export function ComparePage() {
     setSubmitting(true)
     setError(null)
     try {
-      const created = await createExperiment(name.trim(), files, combos, description.trim())
+      // 문서 올리기 · 작업 만들기가 끝날 때까지 (실험 자체는 대기열에서 계속 돌고 실험 화면이 진행을 보여 줌)
+      const created = await busy.run('실험 시작 중', (update) => {
+        update({ detail: `문서 ${files.length}장 × 조합 ${combos.length}개 올리고 작업 ${files.length * combos.length}건 만드는 중` })
+        return createExperiment(name.trim(), files, combos, description.trim())
+      })
       navigate(`/text/experiments/${created.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -98,14 +104,16 @@ export function ComparePage() {
   }
 
   const apply = async (experimentId: string, index: number) => {
-    setCurrent(await applyCombo(experimentId, index))
+    setCurrent(await busy.run('기본 설정에 적용하는 중', () => applyCombo(experimentId, index)))
   }
 
   const remove = async (id: string) => {
     if (!confirm('이 실험 기록을 삭제할까요? (처리된 작업은 문서 처리 기록에 남습니다)')) return
     try {
-      await deleteExperiment(id)
-      await reload()
+      await busy.run('실험 기록 삭제하는 중', async () => {
+        await deleteExperiment(id)
+        await reload()
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     }

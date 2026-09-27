@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { sendJson } from '../api/http'
+import { useBusy } from '../busy/busyContext'
 
 /** 실험 설명: 문서를 어떻게 골랐는지 등 결과를 읽을 때 필요한 설계. 끝난 실험에도 고칠 수 있음 */
 export function ExperimentDescription({
@@ -16,10 +17,11 @@ export function ExperimentDescription({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(description ?? '')
   const [error, setError] = useState<string | null>(null)
+  const overlay = useBusy()
 
   const save = async () => {
     try {
-      await sendJson<void>(`/api/${module}/experiments/${id}/description`, 'PUT', { description: draft })
+      await overlay.run('실험 설명 저장하는 중', () => sendJson<void>(`/api/${module}/experiments/${id}/description`, 'PUT', { description: draft }))
       setEditing(false)
       setError(null)
       onSaved()

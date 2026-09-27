@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { listJobs } from '../../../shared/api/jobs'
 import { isFinished, type JobDto } from '../../../shared/api/types'
 import { StatusBadge } from '../../../shared/components/StatusBadge'
+import { useBusy, waitForJob } from '../../../shared/busy/busyContext'
 import { UploadDropzone } from '../../../shared/components/UploadDropzone'
 import { createTextJob, getPacks, getSettings, type Pack, type SettingsDto } from '../api'
 
@@ -14,6 +15,7 @@ const REFRESH_MS = 3000
 /** 업로드 + 최근 작업 목록 */
 export function TextHomePage() {
   const navigate = useNavigate()
+  const busy = useBusy()
   const [file, setFile] = useState<File | null>(null)
   const [settings, setSettings] = useState<SettingsDto | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -50,8 +52,13 @@ export function TextHomePage() {
     setSubmitting(true)
     setError(null)
     try {
-      const job = await createTextJob(file, undefined, documentType || undefined)
-      navigate(`/text/jobs/${job.jobId}`)
+      // 처리가 끝날 때까지 처리 중 레이어 (작업 화면으로 먼저 옮기고, 끝나면 결과가 보임)
+      await busy.run('문서 처리 중', async (update) => {
+        update({ detail: `${file.name} 올리는 중` })
+        const job = await createTextJob(file, undefined, documentType || undefined)
+        navigate(`/text/jobs/${job.jobId}`)
+        await waitForJob(job.jobId, (text) => update({ detail: text }))
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setSubmitting(false)

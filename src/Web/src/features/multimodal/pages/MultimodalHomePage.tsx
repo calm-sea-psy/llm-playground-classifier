@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { listJobs } from '../../../shared/api/jobs'
 import { isFinished, type JobDto } from '../../../shared/api/types'
 import { StatusBadge } from '../../../shared/components/StatusBadge'
+import { useBusy, waitForJob } from '../../../shared/busy/busyContext'
 import { UploadDropzone } from '../../../shared/components/UploadDropzone'
 import { getImageSettings, type ImageSettingsDto } from '../../image/api'
 import { AppliedPipeline } from '../../image/components/AppliedPipeline'
@@ -15,6 +16,7 @@ const REFRESH_MS = 3000
 /** 이미지 + 텍스트 문서 이미지(OCR) 업로드 + 최근 작업. 이미지 분석 설정은 CNN + VLM 판독 기본 설정 그대로 (표시만) */
 export function MultimodalHomePage() {
   const navigate = useNavigate()
+  const busy = useBusy()
   const [xray, setXray] = useState<File | null>(null)
   const [reportFile, setReportFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -45,8 +47,13 @@ export function MultimodalHomePage() {
     setSubmitting(true)
     setError(null)
     try {
-      const job = await createMultimodalJob(xray, reportFile)
-      navigate(`/multimodal/jobs/${job.jobId}`)
+      // 종합 보고서가 나올 때까지 처리 중 레이어 (작업 화면으로 먼저 옮기고, 끝나면 결과가 보임)
+      await busy.run('종합 보고서 만드는 중', async (update) => {
+        update({ detail: '이미지 · 소견서 올리는 중' })
+        const job = await createMultimodalJob(xray, reportFile)
+        navigate(`/multimodal/jobs/${job.jobId}`)
+        await waitForJob(job.jobId, (text) => update({ detail: text }))
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
       setSubmitting(false)

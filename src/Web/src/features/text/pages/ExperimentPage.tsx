@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { jobFileUrl } from '../../../shared/api/jobs'
+import { useBusy } from '../../../shared/busy/busyContext'
 import { ExperimentDescription, RankMargin } from '../../../shared/components/ExperimentNotes'
 import { PromptMixWarning } from '../../../shared/components/PromptsUsed'
 import {
@@ -26,6 +27,7 @@ export function ExperimentPage() {
 }
 
 function ExperimentDetailView({ id }: { id: string }) {
+  const busy = useBusy()
   const [detail, setDetail] = useState<ExperimentDetail | null>(null)
   const [current, setCurrent] = useState<SettingsDto | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -168,7 +170,7 @@ function ExperimentDetailView({ id }: { id: string }) {
                         <button
                           className={isBest ? 'primary small-button' : 'small-button'}
                           disabled={c.completed === 0}
-                          onClick={async () => setCurrent(await applyCombo(detail.id, c.index))}
+                          onClick={async () => setCurrent(await busy.run('기본 설정에 적용하는 중', () => applyCombo(detail.id, c.index)))}
                         >
                           기본으로 적용
                         </button>

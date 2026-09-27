@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useBusy } from '../../../shared/busy/busyContext'
 import {
   getBuildLog,
   getRelease,
@@ -216,35 +217,59 @@ function BuildSection({ data, blocked, onDone }: { data: ReleaseOverview; blocke
   const logRef = useRef<HTMLPreElement>(null)
   const running = build.state === 'running'
 
-  // 돌고 있으면 1초마다 이어서 받음 (이미 받은 줄 다음부터)
-  useEffect(() => {
-    if (!running) return
-    let next = lines.length
-    let alive = true
-    const timer = window.setInterval(() => {
-      getBuildLog(next).then((s) => {
-        if (!alive) return
-        next = s.next
-        if (s.lines.length) setLines((old) => [...old, ...s.lines])
-        setBuild(s)
-        if (s.state !== 'running') onDone()
-      }, () => {})
-    }, 1000)
-    return () => {
-      alive = false
-      window.clearInterval(timer)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running])
+  const overlay = useBusy()
+  const following = useRef(false)
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
   }, [lines])
 
+  // 빌드가 끝날 때까지 처리 중 레이어: 1초마다 이어서 받은 로그의 마지막 줄들을 팝업에, 전체는 아래 로그 칸에
+  const follow = useCallback(
+    (title: string, begin: () => Promise<BuildSnapshot | null>) => {
+      if (following.current) return
+      following.current = true
+      setError(null)
+      overlay
+        .run(title, async (update) => {
+          update({ detail: 'installer\build.ps1 (게시 ➔ OCR 배포 파일 ➔ Inno Setup) ➔ release-notes.ps1' })
+          const first = await begin()
+          if (first) setBuild(first)
+          let next = 0
+          let snapshot: BuildSnapshot | null = first
+          do {
+            await new Promise((r) => window.setTimeout(r, 1000))
+            snapshot = await getBuildLog(next)
+            next = snapshot.next
+            if (snapshot.lines.length) {
+              const added = snapshot.lines
+              setLines((old) => [...old, ...added])
+              update({ lines: added, detail: added.at(-1) ?? null })
+            }
+            setBuild(snapshot)
+          } while (snapshot.state === 'running')
+        })
+        .catch((e: Error) => setError(e.message))
+        .finally(() => {
+          following.current = false
+          onDone()
+        })
+    },
+    [overlay, onDone],
+  )
+
+  // 화면을 열었을 때 이미 만드는 중이면(새로 고침 등) 바로 따라감
+  useEffect(() => {
+    if (data.build.state === 'running') {
+      setLines([])
+      follow('설치 파일 만드는 중', async () => null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const start = () => {
-    setError(null)
     setLines([])
-    startBuild().then(setBuild, (e: Error) => setError(e.message))
+    follow('설치 파일 만드는 중', () => startBuild())
   }
 
   const setup = data.setup

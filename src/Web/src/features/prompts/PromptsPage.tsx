@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../../shared/api/http'
+import { useBusy } from '../../shared/busy/busyContext'
 import {
   activateVersion,
   deleteVersion,
@@ -175,6 +176,8 @@ function PromptEditor({
   const [note, setNote] = useState('')
   const [tab, setTab] = useState<Tab>('edit')
   const [busy, setBusy] = useState(false)
+  // 화면 전체 처리 중 레이어 (지역 busy 는 버튼 상태)
+  const overlay = useBusy()
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [viewing, setViewing] = useState<number | null>(null)
 
@@ -206,11 +209,11 @@ function PromptEditor({
   const referenceLabel = detail.fileContent != null ? '파일 기본값' : `공용 프롬프트 ${detail.baseName}`
   const viewed = detail.versions.find((v) => v.id === viewing)
 
-  const run = async (action: () => Promise<unknown>, done: string, leaveTo?: string) => {
+  const run = async (action: () => Promise<unknown>, done: string, leaveTo?: string, title = '프롬프트 저장하는 중') => {
     setBusy(true)
     setMessage(null)
     try {
-      await action()
+      await overlay.run(title, action)
       if (leaveTo) {
         // UI 에서 추가한 프롬프트의 마지막 버전을 지우면 프롬프트 자체가 없어짐 ➔ 공용 프롬프트로
         onChanged()
@@ -236,6 +239,8 @@ function PromptEditor({
     run(
       () => savePrompt(module, name, draft, note, activate),
       activate ? '새 버전을 저장하고 적용했습니다. 다음 작업부터 쓰입니다.' : '새 버전을 저장했습니다 (적용 안 함).',
+      undefined,
+      activate ? '새 버전 저장 · 적용하는 중' : '새 버전 저장하는 중',
     )
 
   const canAddVariant = info.allowsModelVariants && !isNew
@@ -364,7 +369,7 @@ function PromptEditor({
                             className="link-button"
                             disabled={busy}
                             onClick={() =>
-                              run(() => activateVersion(module, name, v.id), `v${v.version} 을(를) 적용했습니다.`)
+                              run(() => activateVersion(module, name, v.id), `v${v.version} 을(를) 적용했습니다.`, undefined, `v${v.version} 적용하는 중`)
                             }
                           >
                             적용
@@ -380,6 +385,7 @@ function PromptEditor({
                                 !info.hasFile && detail.versions.length === 1 && detail.baseName
                                   ? `/prompts/${module}/${detail.baseName}`
                                   : undefined,
+                                `v${v.version} 삭제하는 중`,
                               )
                             }
                           >
@@ -408,6 +414,8 @@ function PromptEditor({
                           run(
                             () => resetPrompt(module, name),
                             info.hasFile ? '파일 기본값으로 되돌렸습니다.' : '공용 프롬프트를 쓰도록 되돌렸습니다.',
+                            undefined,
+                            '기본값으로 되돌리는 중',
                           )
                         }
                       >

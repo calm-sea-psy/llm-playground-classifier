@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useBusy } from '../../../shared/busy/busyContext'
 import {
   getPack,
   getPackMeta,
@@ -441,6 +442,8 @@ function PackEditor({
   const [note, setNote] = useState('')
   const [file, setFile] = useState('prompt.md')
   const [busy, setBusy] = useState(false)
+  // 화면 전체 처리 중 레이어 (지역 busy 는 버튼 상태)
+  const overlay = useBusy()
   const [errors, setErrors] = useState<string[]>([])
   const [newFamily, setNewFamily] = useState('')
 
@@ -471,7 +474,10 @@ function PackEditor({
     // 복사로 만들 때는 원본 파일도 새 팩에 모두 써야 함
     if (create) for (const [name, content] of Object.entries(files)) changes[name] = content
     try {
-      await savePack(clean, changes, note, create)
+      await overlay.run(create ? '새 문서 종류 저장하는 중' : '문서 종류 저장하는 중', (update) => {
+        update({ detail: '엔진과 같은 검사를 거친 뒤 packs/ 에 저장합니다 (이전 파일은 .history)' })
+        return savePack(clean, changes, note, create)
+      })
       onSaved()
       navigate(`/text/packs/${clean.id}`)
     } catch (e) {
