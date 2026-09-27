@@ -160,7 +160,10 @@ ul.compact { margin: 0.25rem 0; padding-left: 1.1rem; font-size: 0.9rem; }
 .pane { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.9rem; box-shadow: var(--shadow); min-width: 0; }
 .pane.source { position: sticky; top: 4rem; max-height: calc(100vh - 5rem); overflow: auto; }
 .pane.source img { max-width: 100%; display: block; border-radius: 6px; }
-.pane.source iframe { width: 100%; height: calc(100vh - 10rem); border: none; border-radius: 6px; }
+.pdf-bar { display: flex; align-items: center; gap: 0.35rem; margin-bottom: 0.4rem; font-size: 0.9rem; color: var(--muted); }
+.pdf-bar .spacer { flex: 1; }
+.pdf-page { overflow: auto; }
+.pdf-page canvas { display: block; border-radius: 6px; background: #fff; }
 .source-text { white-space: pre-wrap; word-break: break-all; font-size: 0.88rem; margin: 0; }
 @media (max-width: 900px) {
   .review-body { grid-template-columns: 1fr; }

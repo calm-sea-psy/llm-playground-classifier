@@ -55,7 +55,11 @@ await using (var db = await app.Services.GetRequiredService<IDbContextFactory<Di
 
 app.UseMiddleware<LocalOnly>();
 app.UseDefaultFiles();
-app.UseStaticFiles();  // ClientApp 빌드 결과 (wwwroot)
+// ClientApp 빌드 결과 (wwwroot). PDF.js 의 글꼴 문자표(.bcmap) · 표준 글꼴(.pfb)은 기본 목록에 없는 형식이라 추가 (없으면 404 ➔ 한글이 안 보임)
+var contentTypes = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
+contentTypes.Mappings[".bcmap"] = "application/octet-stream";
+contentTypes.Mappings[".pfb"] = "application/octet-stream";
+app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = contentTypes });
 app.MapDigitizerApi();
 app.MapFallbackToFile("index.html");
 

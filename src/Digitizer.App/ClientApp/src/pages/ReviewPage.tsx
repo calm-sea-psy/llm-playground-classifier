@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { api, ApiError, formatTime, type DocumentDetail, type FieldDef, type Fields, type Issue, type Pack } from '../api.ts'
 import { go } from '../route.ts'
 import { StatusChip } from './DocumentsPage.tsx'
 
 // 검수: 왼쪽 원본(이미지 · PDF · 원문 텍스트) ↔ 오른쪽 필드. 검증 문제 칸 강조 + 이유, 고친 칸 표시.
 // 승인은 여기서만 (자동 승인 없음). 문제가 남았으면 "원본과 대조해 확인함" 을 체크해야 승인됨
+
+// PDF.js(약 2MB)는 PDF 를 열 때만 내려받음
+const PdfViewer = lazy(() => import('../PdfViewer.tsx').then((m) => ({ default: m.PdfViewer })))
 
 type Props = { id: number; packs: Pack[]; onChanged: () => void }
 
@@ -129,7 +132,11 @@ export function ReviewPage({ id, packs, onChanged }: Props) {
             {detail.hasFile && <a className="link" href={`/api/documents/${id}/file`} target="_blank" rel="noreferrer">새 창</a>}
           </div>
           {view === 'file' && detail.fileKind === 'image' && <img src={`/api/documents/${id}/file`} alt={doc.originalName} />}
-          {view === 'file' && detail.fileKind === 'pdf' && <iframe src={`/api/documents/${id}/file`} title={doc.originalName} />}
+          {view === 'file' && detail.fileKind === 'pdf' && (
+            <Suspense fallback={<p className="muted">PDF 보기 준비 중…</p>}>
+              <PdfViewer url={`/api/documents/${id}/file`} />
+            </Suspense>
+          )}
           {view === 'text' && <pre className="source-text">{detail.sourceText ?? '원문이 없습니다 (보관 기한이 지났거나 추출 전 실패)'}</pre>}
           {!detail.hasFile && view === 'file' && <p className="muted">원본 파일이 없습니다</p>}
         </div>

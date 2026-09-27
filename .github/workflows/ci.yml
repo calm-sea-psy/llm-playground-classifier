@@ -47,6 +47,7 @@ jobs:
         run: |
           dotnet publish src/Digitizer.App -c Release -r win-x64 --self-contained -o publish
           if (!(Test-Path publish/wwwroot/index.html)) { throw "게시 결과에 화면(wwwroot/index.html)이 없습니다" }
+          if (!(Test-Path publish/wwwroot/pdfjs/cmaps)) { throw "게시 결과에 PDF 보기용 한글 문자표(wwwroot/pdfjs/cmaps)가 없습니다" }
           if (Test-Path publish/package.json) { throw "화면 소스(package.json)가 게시 결과에 섞였습니다" }
 
   web:
