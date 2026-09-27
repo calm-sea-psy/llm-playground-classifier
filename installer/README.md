@@ -17,3 +17,4 @@ powershell -ExecutionPolicy Bypass -File installer\build.ps1
 - OCR 코드는 `src/OcrService` 의 파일을 그대로 복사하고 설정(`config.toml` 의 엔진 섹션)도 글자 그대로 옮깁니다. 측정한 코드와 배포하는 코드가 같게 하기 위해서입니다.
 - `src/OcrService/.venv` 가 있으면 `ocr-constraints.txt` 와 대조해 다르면 멈춥니다. OCR 환경을 바꿨다면 재측정한 뒤 `build.ps1 -UpdateConstraints` 로 갱신합니다.
 - 설치 도우미 점검만: `setup-helper.ps1 -Check` (아무것도 바꾸지 않음), 특정 단계만: `-Only ocr`, 구성 지정: `-Mode gpu|gpu-small|cpu`.
+- GPU 점검: nvidia-smi 로 GPU · 메모리 · 드라이버 · 드라이버가 지원하는 최대 CUDA 를 읽고, GPU 판 OCR 에 필요한 CUDA(requirements-gpu.txt 의 `cu129` ➔ 12.9)보다 낮거나 NVIDIA 장치는 있는데 nvidia-smi 가 안 되면 알린 뒤 고르게 함 (드라이버 업데이트 후 다시 · CPU 로 설치 · 그래도 GPU). 드라이버 설치는 관리자 권한이 필요해 설치 도우미가 하지 않음

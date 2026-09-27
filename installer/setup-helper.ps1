@@ -67,24 +67,56 @@ function Ask([string]$question) {
 }
 
 # ---------------------------------------------------------------- 0) 사양
+$DriverUrl = 'https://www.nvidia.com/Download/index.aspx'
+
+# GPU 판 OCR 이 요구하는 CUDA 버전: requirements-gpu.txt 의 Paddle 인덱스 주소 (…/cu129/ ➔ 12.9). 측정 환경을 바꾸면 같이 따라감
+function Get-RequiredCuda {
+    $req = Join-Path $ocrDir 'requirements-gpu.txt'
+    if ((Test-Path $req) -and ((Get-Content $req -Raw) -match '/cu(\d{2})(\d)/')) { return [version]"$($Matches[1]).$($Matches[2])" }
+    return $null
+}
+
+# nvidia-smi 표준 출력 줄만 (없거나 실패면 빈 배열). 한 번 GPU 를 못 찾았다고 CPU 구성으로 가지 않게 3번까지 다시.
+# 2>$null 을 쓰면 PowerShell 5.1 이 stderr 한 줄(경고 등)을 Stop 에서 예외로 바꿔 "GPU 없음" 으로 잘못 판정했음 ➔ stderr 는 버림
+function Invoke-NvidiaSmi([string[]]$arguments) {
+    for ($try = 1; $try -le 3; $try++) {
+        $old = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        try {
+            $lines = @(& nvidia-smi @arguments 2>&1 | Where-Object { $_ -isnot [Management.Automation.ErrorRecord] } | ForEach-Object { "$_" })
+            $code = $LASTEXITCODE
+        } catch {
+            $lines = @(); $code = -1  # nvidia-smi 가 없음
+        } finally {
+            $ErrorActionPreference = $old
+        }
+        if ($code -eq 0 -and $lines.Count -gt 0) { return $lines }
+        if ($code -eq -1) { return @() }
+        Start-Sleep -Seconds 1
+    }
+    return @()
+}
+
 function Get-Spec {
     $gpu = $null
-    try {
-        $line = & nvidia-smi --query-gpu=name,memory.total --format=csv,noheader,nounits 2>$null | Select-Object -First 1
-        if ($LASTEXITCODE -eq 0 -and $line) {
-            $parts = $line.Split(',') | ForEach-Object { $_.Trim() }
-            $gpu = @{ Name = $parts[0]; VramGB = [math]::Round([double]$parts[1] / 1024, 1) }
-        }
-    } catch { }
+    $unverified = $null
+    $line = Invoke-NvidiaSmi @('--query-gpu=name,memory.total,driver_version', '--format=csv,noheader,nounits') | Select-Object -First 1
+    if ($line) {
+        $parts = $line.Split(',') | ForEach-Object { $_.Trim() }
+        # 드라이버가 지원하는 최대 CUDA 버전은 nvidia-smi 머리글에만 나옴 ("CUDA Version: 13.1")
+        $cuda = $null
+        if (((Invoke-NvidiaSmi @()) -join "`n") -match 'CUDA Version:\s*(\d+\.\d+)') { $cuda = [version]$Matches[1] }
+        $gpu = @{ Name = $parts[0]; VramGB = [math]::Round([double]$parts[1] / 1024, 1); Driver = $parts[2]; Cuda = $cuda }
+    }
     if (-not $gpu) {
         # nvidia-smi 가 안 되는데 NVIDIA 장치는 보이면 드라이버 문제일 수 있음 ➔ CPU 구성으로 조용히 바꾸지 않도록 알림
         $nvidia = Get-CimInstance Win32_VideoController | Where-Object { $_.Name -match 'NVIDIA' } | Select-Object -First 1
-        if ($nvidia) { Say "NVIDIA 장치($($nvidia.Name))가 있지만 nvidia-smi 로 확인하지 못했습니다 ➔ 드라이버를 확인하세요. GPU 로 쓰려면 -Mode gpu 로 다시 실행" 'Yellow' }
+        if ($nvidia) { $unverified = $nvidia.Name }
     }
     $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 1)
     $drive = (Get-Item $AppDir).PSDrive
     $freeGB = [math]::Round($drive.Free / 1GB, 1)
-    return @{ Gpu = $gpu; RamGB = $ramGB; FreeGB = $freeGB; Drive = $drive.Name }
+    return @{ Gpu = $gpu; Unverified = $unverified; RamGB = $ramGB; FreeGB = $freeGB; Drive = $drive.Name }
 }
 
 function Get-Plan($spec) {
@@ -202,7 +234,8 @@ function Step-Ocr($plan) {
     New-Item -ItemType Directory -Force (Join-Path $ocrDir 'models') | Out-Null
 
     if ($plan.Ocr -eq 'gpu' -and -not (Invoke-Ocr 'import paddle,sys; sys.exit(0 if paddle.device.cuda.device_count() > 0 else 1)')) {
-        throw 'OCR 이 GPU 를 쓰지 못합니다 (NVIDIA 드라이버 확인). GPU 없이 쓰려면 -Mode cpu 로 다시 실행하세요'
+        $need = Get-RequiredCuda
+        throw "OCR 이 GPU 를 쓰지 못합니다. NVIDIA 드라이버가 CUDA $need 이상을 지원해야 합니다 (업데이트: $DriverUrl, 관리자 권한 필요). GPU 없이 쓰려면 시작 메뉴의 설치 도우미를 -Mode cpu 로 다시 실행하세요"
     }
     Say 'OCR 모델 받는 중 (약 100MB, 처음 한 번)'
     if (-not (Invoke-Ocr "from engines import EngineRegistry; r = EngineRegistry(); r.get(); print('OCR engine ready:', r.default_engine)")) {
@@ -238,8 +271,39 @@ function Finish([int]$code) {
 Say "문서 전산화 설치 도우미 ($AppDir)" 'Cyan'
 $spec = Get-Spec
 $plan = Get-Plan $spec
-$gpuText = if ($spec.Gpu) { "$($spec.Gpu.Name) ($($spec.Gpu.VramGB)GB)" } else { '없음 (NVIDIA GPU 를 찾지 못함)' }
+$gpuText = if ($spec.Gpu) { "$($spec.Gpu.Name) ($($spec.Gpu.VramGB)GB, 드라이버 $($spec.Gpu.Driver), CUDA $($spec.Gpu.Cuda) 까지)" } else { '없음 (NVIDIA GPU 를 찾지 못함)' }
 Say "GPU: $gpuText · 메모리: $($spec.RamGB)GB · $($spec.Drive): 남은 공간 $($spec.FreeGB)GB"
+
+# 드라이버 점검: GPU 판 OCR(Paddle CUDA 빌드)이 요구하는 CUDA 보다 드라이버가 낮으면 GPU OCR 이 동작하지 않을 수 있음.
+# 드라이버 업데이트는 관리자 권한이 필요해 설치 도우미가 하지 않음 ➔ 알리고 고르게 함 (조용한 설치는 GPU 로 시도, 실패하면 OCR 단계에서 알림)
+# NVIDIA 장치는 보이는데 nvidia-smi 가 안 됨 (드라이버 없음 · 고장) ➔ 조용히 CPU 로 가지 않게 알리고 고르게 함
+if ($spec.Unverified) {
+    Say "NVIDIA 장치($($spec.Unverified))가 있지만 nvidia-smi 로 확인하지 못했습니다 ➔ NVIDIA 드라이버가 없거나 고장일 수 있습니다" 'Yellow'
+    Say "  드라이버 설치 · 업데이트(관리자 권한 필요, 회사 PC 는 IT 담당자에게): $DriverUrl" 'Yellow'
+    if (-not $Yes -and -not $Check -and $Mode -eq 'auto') {
+        while ($true) {
+            $a = Read-Host '[U] 드라이버를 설치한 뒤 다시 실행 (끝내기) · [C] GPU 없이(CPU) 설치 · [G] 그래도 GPU 로 시도 (작은 모델)'
+            if ($a -match '^[uUㅕ]') { Say "드라이버를 설치한 뒤 시작 메뉴 `"문서 전산화 설치 도우미`" 를 다시 실행하세요"; Finish 1 }
+            if ($a -match '^[cCㅊ]') { break }
+            if ($a -match '^[gGㅎ]') { $plan = Get-Plan @{ Gpu = @{ VramGB = 0 } }; break }
+        }
+    }
+}
+
+$needCuda = Get-RequiredCuda
+$driverOld = $plan.Ocr -eq 'gpu' -and $needCuda -and $spec.Gpu.Cuda -and $spec.Gpu.Cuda -lt $needCuda
+if ($driverOld) {
+    Say ("NVIDIA 드라이버가 오래됐습니다: 이 드라이버({0})는 CUDA {1} 까지, GPU OCR 은 CUDA {2} 이상이 필요합니다" -f $spec.Gpu.Driver, $spec.Gpu.Cuda, $needCuda) 'Yellow'
+    Say "  드라이버 업데이트(관리자 권한 필요, 회사 PC 는 IT 담당자에게): $DriverUrl" 'Yellow'
+    if (-not $Yes -and -not $Check -and $Mode -eq 'auto') {
+        while ($true) {
+            $a = Read-Host '[U] 드라이버를 업데이트한 뒤 다시 실행 (끝내기) · [C] GPU 없이(CPU) 설치 · [G] 그래도 GPU 로 시도'
+            if ($a -match '^[uUㅕ]') { Say "드라이버를 업데이트한 뒤 시작 메뉴 `"문서 전산화 설치 도우미`" 를 다시 실행하세요"; Finish 1 }
+            if ($a -match '^[cCㅊ]') { $plan = Get-Plan @{ Gpu = $null }; break }
+            if ($a -match '^[gGㅎ]') { break }
+        }
+    }
+}
 Say "구성: $($plan.Label)" 'Cyan'
 $downloadGB = $plan.Model.GB + $plan.OcrGB + 0.1
 $needGB = [math]::Ceiling($plan.Model.GB + $plan.OcrGB * 1.8 + 1)
