@@ -7,6 +7,7 @@ export function SettingsPage({ packs }: { packs: Pack[] }) {
   const [root, setRoot] = useState('')
   const [resolved, setResolved] = useState('')
   const [days, setDays] = useState(90)
+  const [autoStart, setAutoStart] = useState(false)
   const [models, setModels] = useState<string[] | null>(null)
   const [path, setPath] = useState('')
   const [busy, setBusy] = useState(false)
@@ -19,6 +20,7 @@ export function SettingsPage({ packs }: { packs: Pack[] }) {
         setRoot(s.settings.documentsRoot)
         setResolved(s.resolvedDocumentsRoot)
         setDays(s.settings.retentionDays)
+        setAutoStart(s.autoStart)
         setModels(s.availableModels)
         setPath(s.settingsPath)
       },
@@ -30,8 +32,9 @@ export function SettingsPage({ packs }: { packs: Pack[] }) {
     setBusy(true)
     setMessage(null)
     try {
-      const r = await api.saveSettings({ model, documentsRoot: root, retentionDays: days })
+      const r = await api.saveSettings({ model, documentsRoot: root, retentionDays: days, autoStart })
       setResolved(r.resolvedDocumentsRoot)
+      setAutoStart(r.autoStart)
       setMessage({ tone: 'ok', text: '저장했습니다. 다음 문서부터 적용됩니다' })
     } catch (e) {
       setMessage({ tone: 'bad', text: (e as Error).message })
@@ -71,6 +74,13 @@ export function SettingsPage({ packs }: { packs: Pack[] }) {
           <span className="label">보관 기한 (일)</span>
           <input type="number" min={1} value={days} onChange={(e) => setDays(Number(e.target.value))} />
           <span className="hint muted">접수일로부터 지나면 원본 · 원문을 지웁니다. 내보낸 문서는 기록만 남습니다</span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} />
+          <span>
+            <b>로그인하면 자동으로 시작</b>
+            <span className="hint muted"> 알림 영역에서 감시 폴더를 계속 확인합니다 (화면은 열지 않음)</span>
+          </span>
         </label>
       </div>
       <div className="buttons">

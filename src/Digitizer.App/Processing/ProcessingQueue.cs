@@ -1,4 +1,5 @@
 using Digitizer.App.Data;
+using Digitizer.App.Hosting;
 using Microsoft.EntityFrameworkCore;
 
 namespace Digitizer.App.Processing;
@@ -13,9 +14,23 @@ public sealed class ProcessingQueue(
     DocumentRunner runner,
     FileRouter router,
     TimeProvider clock,
+    IServiceReadiness readiness,
     ILogger<ProcessingQueue> logger) : BackgroundService
 {
     private readonly SemaphoreSlim _signal = new(0);
+    private volatile bool _paused;
+
+    /// <summary>일시 정지 (트레이 메뉴 · 화면): 접수는 계속 받고 처리만 멈춤. 처리 중인 1건은 끝까지</summary>
+    public bool Paused
+    {
+        get => _paused;
+        set
+        {
+            _paused = value;
+            logger.LogInformation(value ? "처리 일시 정지" : "처리 다시 시작");
+            if (!value) Notify();
+        }
+    }
 
     /// <summary>새 문서가 들어옴 ➔ 쉬고 있으면 깨움</summary>
     public void Notify()
@@ -35,6 +50,8 @@ public sealed class ProcessingQueue(
     {
         var recovered = await RecoverAsync(stoppingToken);
         if (recovered > 0) logger.LogInformation("처리 중에 멈췄던 문서 {Count}건을 다시 처리합니다", recovered);
+        // OCR 서비스가 모델을 읽는 동안 처리하면 연결 거부로 실패 ➔ 준비될 때까지 (최대 3분)
+        await readiness.WaitReadyAsync(stoppingToken);
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -58,6 +75,7 @@ public sealed class ProcessingQueue(
     /// <summary>대기 중인 가장 오래된 1건 처리. 처리할 건이 없으면 false</summary>
     public async Task<bool> ProcessNextAsync(CancellationToken ct = default)
     {
+        if (_paused) return false;
         await using var db = await dbFactory.CreateDbContextAsync(ct);
         var doc = await db.Documents.Where(d => d.Status == DocumentStatus.Queued).OrderBy(d => d.Id).FirstOrDefaultAsync(ct);
         if (doc is null) return false;

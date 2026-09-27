@@ -1,5 +1,6 @@
 using Digitizer.App.Data;
 using Digitizer.App.Export;
+using Digitizer.App.Hosting;
 using Digitizer.App.Processing;
 using Digitizer.App.Review;
 using Microsoft.EntityFrameworkCore;
@@ -18,6 +19,7 @@ public static class ServiceRegistration
         services.AddDbContextFactory<DigitizerDb>(o => o.UseSqlite($"Data Source={paths.Database}"));
         services.AddSingleton<FileRouter>();
         services.AddSingleton<DocumentRunner>();
+        services.AddSingleton<IServiceReadiness, AlwaysReady>();  // 앱은 ServiceSupervisor 로 바꿈
         services.AddSingleton<ProcessingQueue>();
         services.AddSingleton<DocumentIntake>();
         services.AddSingleton<ReviewService>();

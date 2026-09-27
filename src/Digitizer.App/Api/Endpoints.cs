@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using Digitizer.App.Data;
 using Digitizer.App.Export;
+using Digitizer.App.Hosting;
 using Digitizer.App.Processing;
 using Digitizer.App.Review;
 using Digitizer.App.Status;
@@ -208,15 +209,30 @@ public static class Endpoints
             });
         });
 
-        api.MapGet("/settings", async (SettingsFile settings, SystemCheck check) => new
+        // 처리 대기열: 일시 정지 (트레이 메뉴와 같은 스위치) · 대기 건수
+        api.MapGet("/queue", async (ProcessingQueue queue, IDbContextFactory<DigitizerDb> f) =>
         {
+            await using var db = await f.CreateDbContextAsync();
+            return new
+            {
+                queue.Paused,
+                Queued = await db.Documents.CountAsync(d => d.Status == DocumentStatus.Queued),
+                Processing = await db.Documents.CountAsync(d => d.Status == DocumentStatus.Processing),
+            };
+        });
+        api.MapPost("/queue/pause", (ProcessingQueue queue) => { queue.Paused = true; return Results.Ok(new { queue.Paused }); });
+        api.MapPost("/queue/resume", (ProcessingQueue queue) => { queue.Paused = false; return Results.Ok(new { queue.Paused }); });
+
+        api.MapGet("/settings", async (SettingsFile settings, SystemCheck check, AutoStart autoStart) => new
+        {
+            AutoStart = autoStart.IsEnabled(AutoStart.CurrentExe),
             Settings = settings.Current,
             ResolvedDocumentsRoot = settings.Current.ResolvedDocumentsRoot,
             AvailableModels = await check.OllamaModelsAsync(),
             SettingsPath = settings.Path,
         });
 
-        api.MapPut("/settings", (SettingsChange change, SettingsFile settings, PackCatalog catalog, FileRouter router) =>
+        api.MapPut("/settings", (SettingsChange change, SettingsFile settings, PackCatalog catalog, FileRouter router, AutoStart autoStart) =>
         {
             var next = settings.Current with
             {
@@ -230,12 +246,18 @@ public static class Endpoints
             {
                 settings.Save(next);
                 router.Folders.Ensure(catalog.Packs);  // 새 위치에 넣기 폴더 만들기
+                if (change.AutoStart is { } on) autoStart.Set(on, AutoStart.CurrentExe);
             }
             catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
-            return Results.Ok(new { Settings = settings.Current, ResolvedDocumentsRoot = settings.Current.ResolvedDocumentsRoot });
+            return Results.Ok(new
+            {
+                AutoStart = autoStart.IsEnabled(AutoStart.CurrentExe),
+                Settings = settings.Current,
+                ResolvedDocumentsRoot = settings.Current.ResolvedDocumentsRoot,
+            });
         });
 
         api.MapGet("/status", async (SystemCheck check) => new { Checks = await check.RunAsync() });
@@ -244,7 +266,7 @@ public static class Endpoints
     public sealed record ExportRequest(string PackId, bool IncludeExported = false);
 
     /// <summary>설정 화면에서 바꿀 수 있는 것 (나머지 처리 설정은 측정한 값 그대로, 파일에서만)</summary>
-    public sealed record SettingsChange(string? DocumentsRoot, int? RetentionDays, string? Model);
+    public sealed record SettingsChange(string? DocumentsRoot, int? RetentionDays, string? Model, bool? AutoStart);
 
     private static DateTimeOffset LocalStart(DateOnly day) =>
         new(day.ToDateTime(TimeOnly.MinValue), TimeZoneInfo.Local.GetUtcOffset(day.ToDateTime(TimeOnly.MinValue)));

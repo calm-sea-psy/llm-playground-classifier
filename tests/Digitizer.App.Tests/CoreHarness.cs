@@ -55,7 +55,7 @@ public sealed class CoreHarness : IDisposable
     public AppPaths Paths { get; }
     public SettingsFile Settings { get; }
 
-    public CoreHarness(Func<string, JsonObject?>? respond = null, double stableSeconds = 0)
+    public CoreHarness(Func<string, JsonObject?>? respond = null, double stableSeconds = 0, Microsoft.Extensions.Logging.ILoggerProvider? log = null)
     {
         Extractor = new FakeExtractor(respond ?? (user => Samples.Receipt()));
         Paths = new AppPaths(Path.Combine(Temp, "data"));
@@ -64,6 +64,7 @@ public sealed class CoreHarness : IDisposable
         Settings.Save(Settings.Current with { DocumentsRoot = Path.Combine(Temp, "docs"), StableSeconds = stableSeconds });
 
         var services = new ServiceCollection().AddLogging();
+        if (log is not null) services.AddSingleton(log);  // 로그 파일 시험 (LoggerFactory 가 등록된 ILoggerProvider 를 모두 씀)
         services.AddDigitizerCore(Paths, Settings);
         services.AddSingleton<TimeProvider>(Clock);
         services.AddSingleton<ISourceReader>(Reader);

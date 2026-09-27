@@ -48,7 +48,9 @@
       "runtimeArgs": [
         "run",
         "--project",
-        "src/Digitizer.App"
+        "src/Digitizer.App",
+        "--",
+        "--background"
       ],
       "port": 5310,
       "env": {

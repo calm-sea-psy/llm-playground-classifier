@@ -69,7 +69,7 @@ public sealed class FolderWatcher(PackCatalog catalog, FileRouter router, Docume
                 }
                 catch (IOException ex)
                 {
-                    logger.LogWarning("{File} 을(를) 아직 접수하지 못함, 다시 시도: {Message}", info.Name, ex.Message);
+                    logger.LogWarning("{Pack} 넣기 폴더의 파일을 아직 접수하지 못함, 다시 시도: {Message}", pack.Id, ex.Message);  // 파일 이름은 개인정보일 수 있어 남기지 않음
                 }
                 _seen.Remove(path);
             }

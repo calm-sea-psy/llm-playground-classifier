@@ -23,6 +23,7 @@ export default function App() {
   const [packs, setPacks] = useState<Pack[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [reviewCount, setReviewCount] = useState(0)
+  const [queue, setQueue] = useState<{ paused: boolean; queued: number } | null>(null)
 
   useEffect(() => {
     const onHash = () => setRoute(parseRoute())
@@ -34,8 +35,9 @@ export default function App() {
     api.packs().then(setPacks, (e: Error) => setError(e.message))
   }, [])
 
-  // 확인 필요 건수 배지 (10초마다)
+  // 확인 필요 건수 배지 · 일시 정지 상태 (10초마다, 알림 영역 메뉴에서 바꿀 수도 있음)
   const refreshCount = useCallback(() => {
+    api.queue().then(setQueue, () => {})
     api.counts().then(
       (rows) => setReviewCount(rows.filter((r) => r.status === 'NeedsReview').reduce((s, r) => s + r.count, 0)),
       () => {},
@@ -73,6 +75,12 @@ export default function App() {
           ))}
         </nav>
       </header>
+      {queue?.paused && (
+        <div className="paused">
+          처리를 일시 정지했습니다{queue.queued > 0 ? ` (대기 ${queue.queued}건)` : ''}. 새 문서는 접수만 됩니다.
+          <button onClick={() => api.setPaused(false).then(refreshCount, () => {})}>다시 시작</button>
+        </div>
+      )}
       <main>{page}</main>
     </div>
   )

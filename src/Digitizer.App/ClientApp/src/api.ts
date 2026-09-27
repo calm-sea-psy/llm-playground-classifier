@@ -136,9 +136,11 @@ export const api = {
       topFields: { field: string; count: number }[]
     }[]>('GET', '/api/stats/corrections'),
   settings: () =>
-    request<{ settings: Settings; resolvedDocumentsRoot: string; availableModels: string[] | null; settingsPath: string }>('GET', '/api/settings'),
-  saveSettings: (body: { documentsRoot?: string; retentionDays?: number; model?: string }) =>
-    request<{ settings: Settings; resolvedDocumentsRoot: string }>('PUT', '/api/settings', body),
+    request<{ autoStart: boolean; settings: Settings; resolvedDocumentsRoot: string; availableModels: string[] | null; settingsPath: string }>('GET', '/api/settings'),
+  saveSettings: (body: { documentsRoot?: string; retentionDays?: number; model?: string; autoStart?: boolean }) =>
+    request<{ autoStart: boolean; settings: Settings; resolvedDocumentsRoot: string }>('PUT', '/api/settings', body),
+  queue: () => request<{ paused: boolean; queued: number; processing: number }>('GET', '/api/queue'),
+  setPaused: (paused: boolean) => request<{ paused: boolean }>('POST', paused ? '/api/queue/pause' : '/api/queue/resume'),
   status: () => request<{ checks: CheckItem[] }>('GET', '/api/status'),
 }
 

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Digitizer.App.Hosting;
 using Digitizer.App.Processing;
 
 namespace Digitizer.App.Status;
@@ -15,7 +16,7 @@ public sealed record CheckItem(string Name, string Level, string Detail, string?
 }
 
 /// <summary>상태 점검 화면: Ollama 실행 · 모델 있음 · OCR 서비스 · GPU · 디스크 여유 (각각 해결 방법과 함께)</summary>
-public sealed class SystemCheck(SettingsFile settings, IHttpClientFactory http, AppPaths paths)
+public sealed class SystemCheck(SettingsFile settings, IHttpClientFactory http, AppPaths paths, ServiceSupervisor? supervisor = null)
 {
     public const long LowDiskBytes = 5L * 1024 * 1024 * 1024;
 
@@ -75,12 +76,15 @@ public sealed class SystemCheck(SettingsFile settings, IHttpClientFactory http, 
             if (engine is null)
                 return new("OCR 서비스", CheckItem.Bad, $"실행 중이지만 {s.OcrEngine} 엔진이 없습니다", "설치 도우미로 OCR 을 다시 설치하세요");
             var loaded = engine["loaded"]?.GetValue<bool>() == true;
-            return new("OCR 서비스", CheckItem.Ok, $"실행 중 ({s.OcrEngine}{(loaded ? ", 모델 준비됨" : ", 첫 문서 때 모델을 읽음")})");
+            var how = supervisor?.OcrMode switch { "managed" => ", 프로그램이 실행함", "external" => ", 따로 실행된 서비스", _ => "" };
+            return new("OCR 서비스", CheckItem.Ok, $"실행 중 ({s.OcrEngine}{(loaded ? ", 모델 준비됨" : ", 첫 문서 때 모델을 읽음")}{how})");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
-            return new("OCR 서비스", CheckItem.Bad, $"{s.OcrUrl} 에 연결하지 못했습니다",
-                "프로그램을 다시 시작하세요. 계속되면 설치 도우미로 OCR 을 다시 설치하세요");
+            if (supervisor?.OcrMode == "starting")
+                return new("OCR 서비스", CheckItem.Warn, "시작하는 중 (모델을 읽는 데 1분 정도 걸림)", "잠시 뒤 다시 확인하세요. 그동안 들어온 문서는 준비되면 처리합니다");
+            return new("OCR 서비스", CheckItem.Bad, supervisor?.OcrProblem ?? $"{s.OcrUrl} 에 연결하지 못했습니다",
+                "프로그램을 다시 시작하세요. 계속되면 설치 도우미로 OCR 을 다시 설치하세요 (로그 폴더의 ocr-날짜.log 에 원인)");
         }
     }
 

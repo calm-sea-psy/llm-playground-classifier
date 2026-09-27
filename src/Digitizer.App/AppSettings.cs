@@ -47,6 +47,14 @@ public sealed record AppSettings
     /// <summary>GPU 없는 PC 는 여러 쪽 스캔 OCR 이 오래 걸림 (평가 도구의 30초보다 넉넉히)</summary>
     public int OcrTimeoutSeconds { get; init; } = 180;
 
+    /// <summary>
+    /// OCR 서비스 폴더 (main.py 와 .venv 가 있는 곳). 비어 있으면 실행 폴더의 ocr\. OcrUrl 에 이미 서비스가 떠 있으면 그걸 쓰고,
+    /// 없으면 프로그램이 이 폴더의 서비스를 자식 프로세스로 실행 (프로그램이 끝나면 같이 끝남)
+    /// </summary>
+    public string OcrServiceDir { get; init; } = "";
+    /// <summary>시작할 때 Ollama 가 꺼져 있으면 실행 시도 (Ollama 는 프로그램이 끝나도 그대로 둠, 사용자 프로그램이므로)</summary>
+    public bool StartOllama { get; init; } = true;
+
     /// <summary>감시 폴더: 크기 · 수정 시각이 이 시간 동안 그대로여야 처리 (복사 중인 파일 건너뜀)</summary>
     public double StableSeconds { get; init; } = 2;
 

@@ -7,6 +7,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Digitizer</AssemblyName>
     <RootNamespace>Digitizer.App</RootNamespace>
+    <!-- 콘솔 창 없는 exe + 알림 영역 아이콘(WinForms). 작업 개체 P/Invoke(LibraryImport) -->
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <!-- CI(ubuntu)에서도 빌드만은 되게. 실행 · 설치 파일은 Windows 전용 -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <PacksRoot>$(MSBuildThisFileDirectory)..\..\packs\</PacksRoot>
