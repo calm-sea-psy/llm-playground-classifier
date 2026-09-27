@@ -46,6 +46,9 @@ public sealed class TargetOptions
     public List<string> Args { get; set; } = [];
     public string Cwd { get; set; } = ".";
     public Dictionary<string, string> Env { get; set; } = [];
+    /// <summary>중지 명령 (docker compose stop 등). 없으면 Monitor 가 띄운 프로세스 또는 체크 포트 점유 프로세스를 종료</summary>
+    public string? StopCommand { get; set; }
+    public List<string> StopArgs { get; set; } = [];
     /// <summary>실행 후 바로 끝나는 명령 (docker compose up -d). 프로세스를 추적하지 않음</summary>
     public bool OneShot { get; set; }
     /// <summary>시작 직후 이 시간 동안은 체크 실패를 세지 않음 (모델 로딩 등)</summary>

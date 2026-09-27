@@ -144,7 +144,7 @@ X-ray 영상: Kermany et al., [Chest X-Ray Images (Pneumonia)](https://www.kaggl
 | 영상 | Python FastAPI, PyTorch, TorchXRayVision (18소견), 미세조정 DenseNet121 (소아 폐렴), Grad-CAM |
 | LLM | Ollama: gemma4:12b (기본), qwen3-vl:8b, qwen3-vl:8b-instruct |
 | 웹 | React 19, Vite, TypeScript |
-| 운영 | 모니터링 서버(.NET): 헬스 체크, 자동 재시작, Discord/Slack 알림 |
+| 운영 | 모니터링 서버(.NET): 헬스 체크, 감시 시작 · 중지 · 모두 중지, 자동 재시작, Discord/Slack 알림 |
 | 품질 | xUnit 단위 테스트 (규칙 검증, 프롬프트 검사, 작업 기록), GitHub Actions |
 
 ```mermaid
@@ -180,7 +180,7 @@ cd src/Monitor
 dotnet run
 ```
 
-모니터링 서버가 PostgreSQL, OCR, CNN, API, 웹을 순서대로 띄웁니다. 브라우저에서 `http://localhost:5173` 을 엽니다.
+`http://127.0.0.1:5100` 에서 **감시 시작** 을 누르면 모니터링 서버가 PostgreSQL, OCR, CNN, API, 웹을 순서대로 띄웁니다. 브라우저에서 `http://localhost:5173` 을 엽니다. 끝낼 때는 **모두 중지** 를 누른 뒤 터미널을 닫습니다.
 
 ## 한계와 도입 전에 더 필요한 것
 

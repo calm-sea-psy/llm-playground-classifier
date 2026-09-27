@@ -95,6 +95,12 @@ public sealed partial class ProcessManager(IOptions<MonitorOptions> options, IHo
     /// </summary>
     public void Stop(TargetOptions target)
     {
+        // 중지 명령이 있는 대상(docker compose stop)은 그 명령으로. 포트 점유 프로세스는 Docker 백엔드라 죽이면 안 됨
+        if (target.StopCommand is not null)
+        {
+            RunToEnd(target, target.StopCommand, target.StopArgs);
+            return;
+        }
         Process? owned;
         lock (_lock)
         {
@@ -105,8 +111,9 @@ public sealed partial class ProcessManager(IOptions<MonitorOptions> options, IHo
             log.LogInformation("{Target} 종료 (PID {Pid}, 트리째)", target.Name, owned.Id);
             owned.Kill(entireProcessTree: true);
             owned.WaitForExit(5000);
-            return;
         }
+        // 트리째 종료해도 손자 프로세스가 남을 수 있음 (npm run dev: cmd ➔ npm ➔ cmd ➔ node vite 에서 vite 가 고아로 남아 5173 을 계속 점유)
+        // ➔ 체크 포트를 아직 점유한 프로세스도 종료
         if (PortOwner(target.Check) is { } pid && pid != Environment.ProcessId)
         {
             try
@@ -132,6 +139,41 @@ public sealed partial class ProcessManager(IOptions<MonitorOptions> options, IHo
                 p.Kill(entireProcessTree: true);
             }
             _owned.Clear();
+        }
+    }
+
+    /// <summary>끝날 때까지 기다리는 명령 (최대 60초). 출력은 대상 로그에</summary>
+    private void RunToEnd(TargetOptions target, string command, List<string> args)
+    {
+        var candidate = Path.Combine(RepoRoot, command);
+        var info = new ProcessStartInfo(File.Exists(candidate) ? Path.GetFullPath(candidate) : command)
+        {
+            WorkingDirectory = Path.GetFullPath(Path.Combine(RepoRoot, target.Cwd)),
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+        foreach (var arg in args)
+        {
+            info.ArgumentList.Add(arg);
+        }
+        using var process = Process.Start(info) ?? throw new InvalidOperationException($"{target.Name}: 중지 명령을 실행할 수 없습니다");
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        if (!process.WaitForExit(60_000))
+        {
+            process.Kill(entireProcessTree: true);
+            throw new TimeoutException($"{target.Name}: 중지 명령이 60초 안에 끝나지 않았습니다");
+        }
+        var logDir = Path.Combine(RepoRoot, "data", "monitor", "logs");
+        Directory.CreateDirectory(logDir);
+        File.AppendAllText(Path.Combine(logDir, $"{target.Name}.log"),
+            $"==== {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss} 중지: {command} {string.Join(' ', args)} (코드 {process.ExitCode})\n{stdout.Result}{stderr.Result}");
+        log.LogInformation("{Target} 중지 명령 완료 (코드 {Code})", target.Name, process.ExitCode);
+        if (process.ExitCode != 0)
+        {
+            throw new InvalidOperationException($"{target.Name}: 중지 명령 실패 (코드 {process.ExitCode})");
         }
     }
 

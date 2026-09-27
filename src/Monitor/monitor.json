@@ -8,6 +8,8 @@
         "Check": "tcp://127.0.0.1:5432",
         "Command": "docker",
         "Args": [ "compose", "up", "-d", "postgres" ],
+        "StopCommand": "docker",
+        "StopArgs": [ "compose", "stop", "postgres" ],
         "Cwd": ".",
         "OneShot": true,
         "StartupSeconds": 30,

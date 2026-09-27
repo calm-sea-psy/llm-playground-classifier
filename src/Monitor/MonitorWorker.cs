@@ -4,11 +4,22 @@ using Microsoft.Extensions.Options;
 
 namespace Monitor;
 
-/// <summary>상태 페이지·API 가 읽는 스냅샷 + 수동 재시작 요청 창구</summary>
+public enum CommandKind
+{
+    Restart,
+    Stop,
+    StopAll,
+    StartWatching,
+}
+
+public sealed record MonitorCommand(CommandKind Kind, string? Target = null);
+
+/// <summary>상태 페이지·API 가 읽는 스냅샷 + 버튼 요청 창구 (시작 · 중지 · 모두 중지 · 감시 시작). 처리는 워커 스레드에서</summary>
 public sealed class MonitorState
 {
     private volatile IReadOnlyList<TargetDto> _snapshot = [];
-    internal readonly Channel<string> RestartRequests = Channel.CreateUnbounded<string>();
+    private volatile bool _watching;
+    internal readonly Channel<MonitorCommand> Commands = Channel.CreateUnbounded<MonitorCommand>();
     internal readonly Channel<bool> Wake = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
     {
         FullMode = BoundedChannelFullMode.DropWrite,
@@ -17,17 +28,30 @@ public sealed class MonitorState
     public IReadOnlyList<TargetDto> Snapshot => _snapshot;
     public DateTimeOffset? LastTickAt { get; internal set; }
 
+    /// <summary>감시 중 = 꺼진 대상 자동 (재)시작. Monitor 를 켠 직후는 꺼짐 (상태 확인만) ➔ 감시 시작 버튼으로 켬, 모두 중지로 끔</summary>
+    public bool Watching
+    {
+        get => _watching;
+        internal set => _watching = value;
+    }
+
     internal void Publish(IReadOnlyList<TargetDto> snapshot) => _snapshot = snapshot;
 
-    public bool RequestRestart(string name)
+    /// <summary>대상 하나에 대한 요청. 없는 대상 · 감시만 하는 대상이면 false</summary>
+    public bool Request(CommandKind kind, string name)
     {
-        if (_snapshot.All(t => t.Name != name))
+        if (_snapshot.FirstOrDefault(t => t.Name == name) is not { Manageable: true })
         {
             return false;
         }
-        RestartRequests.Writer.TryWrite(name);
-        Wake.Writer.TryWrite(true);
+        Send(new MonitorCommand(kind, name));
         return true;
+    }
+
+    public void Send(MonitorCommand command)
+    {
+        Commands.Writer.TryWrite(command);
+        Wake.Writer.TryWrite(true);
     }
 }
 
@@ -119,9 +143,16 @@ public sealed class MonitorWorker(
             }
         }
         var manual = new HashSet<string>();
-        while (state.RestartRequests.Reader.TryRead(out var name))
+        while (state.Commands.Reader.TryRead(out var command))
         {
-            manual.Add(name);
+            try
+            {
+                await HandleCommandAsync(command, now, manual, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                log.LogError(ex, "요청 처리 중 오류: {Command}", command);
+            }
         }
 
         // 체크는 동시에, 판정은 의존 순서대로 (의존 항목의 이번 주기 상태를 보고 Warning 결정)
@@ -141,6 +172,62 @@ public sealed class MonitorWorker(
 
         state.Publish(_targets.Select(t => t.ToDto(processes.OwnedPid(t.Options.Name))).ToList());
         state.LastTickAt = now;
+    }
+
+    private async Task HandleCommandAsync(MonitorCommand command, DateTimeOffset now, HashSet<string> manual, CancellationToken ct)
+    {
+        switch (command.Kind)
+        {
+            case CommandKind.Restart:
+                manual.Add(command.Target!);
+                break;
+            case CommandKind.Stop when Find(command.Target!) is { Manageable: true } t:
+                await StopTargetAsync(t, "중지함", ct);
+                break;
+            case CommandKind.StartWatching:
+                // 중지 표시 · 재시작 한도를 모두 풀고 꺼진 대상은 바로 시작 (의존 순서는 MaybeRestartAsync 가 지킴)
+                state.Watching = true;
+                foreach (var t in _targets)
+                {
+                    t.Stopped = false;
+                    t.RestartAttempts.Clear();
+                    ResetRestart(t);
+                    t.NextRestartAt = now;
+                }
+                await notifier.NotifyAsync("monitor", "WatchStarted", null, null, "감시 시작: 꺼진 서버를 의존 순서대로 시작, 이후 자동 재시작", ct);
+                break;
+            case CommandKind.StopAll:
+                // 감시를 먼저 끄고 의존 역순 (web ➔ api ➔ ocr · cnn ➔ postgres) 으로 중지. 감시만 하는 대상(Ollama)은 그대로
+                state.Watching = false;
+                foreach (var t in Enumerable.Reverse(_targets).Where(t => t.Manageable))
+                {
+                    await StopTargetAsync(t, "모두 중지", ct);
+                }
+                await notifier.NotifyAsync("monitor", "WatchStopped", null, null, "모두 중지: 감시를 멈췄습니다 (Monitor 를 종료해도 됩니다)", ct);
+                break;
+        }
+    }
+
+    private async Task StopTargetAsync(TargetRuntime t, string message, CancellationToken ct)
+    {
+        var previous = t.State;
+        t.Stopped = true;
+        t.NextRestartAt = null;
+        t.StartedAt = null;
+        t.ConsecutiveFailures = 0;
+        try
+        {
+            processes.Stop(t.Options);
+            t.State = TargetState.Stopped;
+            t.Reason = message;
+            await notifier.NotifyAsync(t.Options.Name, "Stopped", previous, t.State, message, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            t.Reason = $"중지 실패: {ex.Message}";
+            await notifier.NotifyAsync(t.Options.Name, "StopFailed", previous, previous, t.Reason, ct);
+        }
+        await notifier.PublishStateAsync(t.ToDto(processes.OwnedPid(t.Options.Name)), ct);
     }
 
     private async Task ProcessTargetAsync(
@@ -174,6 +261,13 @@ public sealed class MonitorWorker(
 
     private (TargetState, string?) Judge(TargetRuntime t, CheckResult result, DateTimeOffset now)
     {
+        if (t.Stopped)
+        {
+            t.ConsecutiveFailures = 0;
+            return result.Health is Health.Healthy or Health.Degraded
+                ? (TargetState.Warning, "중지했지만 아직 응답함 (다른 곳에서 실행 중일 수 있음)")
+                : (TargetState.Stopped, "중지함");
+        }
         switch (result.Health)
         {
             case Health.Healthy:
@@ -196,7 +290,7 @@ public sealed class MonitorWorker(
             return (TargetState.Starting, $"시작 중 {elapsed}/{t.Options.StartupSeconds}초 ({result.Detail})");
         }
         // Monitor 를 켰을 때 이미 꺼져 있던 대상은 3회를 기다리지 않고 바로 Down (기동 시 스택 올리기)
-        if (t.State is TargetState.Unknown or TargetState.Starting or TargetState.Down
+        if (t.State is TargetState.Unknown or TargetState.Starting or TargetState.Down or TargetState.Stopped
             || t.ConsecutiveFailures >= options.Value.FailuresToDown)
         {
             return (TargetState.Down, $"{result.Detail} ({t.ConsecutiveFailures}회 연속)");
@@ -211,11 +305,21 @@ public sealed class MonitorWorker(
             return;
         }
         var name = t.Options.Name;
+        // 감시 전(Monitor 를 막 켬 · 모두 중지 뒤) · 중지한 대상은 화면 상태만 바꾸고 알림(웹훅)은 보내지 않음
+        if (!state.Watching || t.State is TargetState.Stopped)
+        {
+            if (t.State is TargetState.Down)
+            {
+                t.NextRestartAt = now;
+            }
+            await notifier.PublishStateAsync(t.ToDto(processes.OwnedPid(name)), ct);
+            return;
+        }
         switch (t.State)
         {
             case TargetState.Down:
                 // 다음 재시작까지 대기: 기동 직후 발견이면 즉시, 아니면 5초 ➔ 10초 ➔ 20초 …
-                t.NextRestartAt = previous == TargetState.Unknown ? now : now + Backoff(t.BackoffStep);
+                t.NextRestartAt = previous is TargetState.Unknown or TargetState.Stopped ? now : now + Backoff(t.BackoffStep);
                 var kind = previous == TargetState.Starting ? "RestartFailed" : "Down";
                 var message = previous == TargetState.Starting
                     ? $"재시작 실패: {t.Reason}"
@@ -247,6 +351,11 @@ public sealed class MonitorWorker(
         {
             return;
         }
+        if (!state.Watching)
+        {
+            t.Reason += " · 감시 시작 전 (자동 시작 안 함)";
+            return;
+        }
         var waiting = t.Options.DependsOn.Where(d => Find(d) is { State: not (TargetState.Up or TargetState.Warning) }).ToList();
         if (waiting.Count > 0)
         {
@@ -273,13 +382,14 @@ public sealed class MonitorWorker(
         await StartAsync(t, now, $"재시작 시도 {t.RestartAttempts.Count + 1}/{policy.MaxAttempts}", ct);
     }
 
-    /// <summary>상태 페이지의 재시작 버튼: 한도·백오프를 초기화하고 즉시 종료 ➔ 시작</summary>
+    /// <summary>상태 페이지의 시작 · 재시작 버튼: 중지 표시 · 한도 · 백오프를 초기화하고 즉시 종료 ➔ 시작 (감시 전이면 한 번만 시작)</summary>
     private async Task ManualRestartAsync(TargetRuntime t, DateTimeOffset now, CancellationToken ct)
     {
         if (t.Options.Command is null)
         {
             return;
         }
+        t.Stopped = false;
         t.GaveUp = false;
         t.RestartAttempts.Clear();
         t.BackoffStep = 0;
@@ -328,8 +438,13 @@ public sealed class MonitorWorker(
     /// <summary>Down 이거나 재시작 중(Starting)인 의존 항목 ➔ 완전히 복구될 때까지 이 대상도 Warning 유지</summary>
     private List<string> DownDependencies(TargetRuntime t) =>
         t.Options.DependsOn
-            .Where(d => Find(d) is { State: TargetState.Down or TargetState.Starting })
-            .Select(d => Find(d)!.State == TargetState.Starting ? $"{d}(재시작 중)" : d)
+            .Where(d => Find(d) is { State: TargetState.Down or TargetState.Starting or TargetState.Stopped })
+            .Select(d => Find(d)!.State switch
+            {
+                TargetState.Starting => $"{d}(재시작 중)",
+                TargetState.Stopped => $"{d}(중지)",
+                _ => d,
+            })
             .ToList();
 
     private TargetRuntime? Find(string name) => _targets.FirstOrDefault(t => t.Options.Name == name);

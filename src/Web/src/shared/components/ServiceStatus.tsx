@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 interface TargetStatus {
   name: string
-  state: 'Unknown' | 'Starting' | 'Up' | 'Warning' | 'Down'
+  state: 'Unknown' | 'Starting' | 'Up' | 'Warning' | 'Down' | 'Stopped'
   reason: string | null
   gaveUp: boolean
 }
@@ -14,6 +14,7 @@ const LABEL: Record<TargetStatus['state'], string> = {
   Down: '중단',
   Starting: '시작 중',
   Unknown: '확인 중',
+  Stopped: '중지',
 }
 
 /** 헤더 오른쪽 서비스 상태 (모니터링 서버 /status). 모니터가 꺼져 있으면 표시하지 않음 */
