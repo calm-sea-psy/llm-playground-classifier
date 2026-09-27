@@ -59,11 +59,11 @@ function Write-OcrConfig([string]$file, [string]$engine, [string[]]$engines, [st
 Write-OcrConfig 'config.gpu.toml' 'paddleocr' @('paddleocr', 'paddleocr_cpu') 'NVIDIA GPU'
 Write-OcrConfig 'config.cpu.toml' 'paddleocr_cpu' @('paddleocr_cpu') 'GPU 없음'
 
-# requirements.txt ➔ 문서 파싱(paddlex[ocr]) 제외, CPU 판은 paddlepaddle (PyPI)
+# requirements.txt ➔ 문서 파싱(paddlex[ocr]) 제외, CPU 판은 paddlepaddle (Paddle CPU 인덱스: PyPI 에는 3.3.1 까지라 측정한 3.4.0 이 없음)
 $req = Get-Content (Join-Path $src 'requirements.txt') -Encoding UTF8 | Where-Object { $_ -notmatch '^paddlex\[ocr\]' -and $_ -notmatch '^# \[ocr\]' }
 $gpuReq = @('# 문서 전산화 설치판 OCR 의존성 (NVIDIA GPU). installer\build.ps1 이 src\OcrService\requirements.txt 에서 만듦') + $req
 $cpuReq = @('# 문서 전산화 설치판 OCR 의존성 (GPU 없음). installer\build.ps1 이 src\OcrService\requirements.txt 에서 만듦') +
-    ($req | Where-Object { $_ -notmatch '^--extra-index-url' -and $_ -notmatch '^# paddlepaddle-gpu' } | ForEach-Object { $_ -replace '^paddlepaddle-gpu==', 'paddlepaddle==' })
+    ($req | Where-Object { $_ -notmatch '^# paddlepaddle-gpu' } | ForEach-Object { $_ -replace '^paddlepaddle-gpu==', 'paddlepaddle==' -replace '^(--extra-index-url https://www\.paddlepaddle\.org\.cn/packages/stable/)cu\d+/', '$1cpu/' })
 [IO.File]::WriteAllLines((Join-Path $ocr 'requirements-gpu.txt'), [string[]]$gpuReq, (New-Object Text.UTF8Encoding $false))
 [IO.File]::WriteAllLines((Join-Path $ocr 'requirements-cpu.txt'), [string[]]$cpuReq, (New-Object Text.UTF8Encoding $false))
 

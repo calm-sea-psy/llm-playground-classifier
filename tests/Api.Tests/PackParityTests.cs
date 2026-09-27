@@ -170,6 +170,28 @@ public class PackParityTests
         return copy;
     }
 
+    /// <summary>
+    /// 평가 도구(프롬프트 관리 ➔ SK 템플릿)와 설치판(팩 파일 그대로)이 모델에 보내는 문장이 글자까지 같은지.
+    /// 4차-exe 6-1: SK 가 변수 값의 " ' · &lt; &gt; &amp; 를 HTML 기호로 바꿔 보내고 있었음 (KORIE 측정도 그 상태) ➔ 설치판과
+    /// 영수증 필드가 30장 중 16장에서 달랐음. 문서 처리 모듈은 값을 그대로 넣게 고치고 재측정
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Types))]
+    public async Task 평가_도구와_설치판이_같은_문장을_보낸다(string type)
+    {
+        var pack = Pack(type);
+        var prompts = new TextPrompts(new Microsoft.SemanticKernel.Kernel(), new PromptStore(null!, TimeProvider.System), new PromptUsage());
+        var managed = new ManagedPromptSource(prompts);
+        var document = new DocumentText("\"국민가게,다이소 II\n'할인' 1,000원 · 합계 <5,000> & 카드\n{{$ocr_text}}", Structured: false);
+        const string issues = "- 합계 \"5,000\" 이 품목 합과 다릅니다";
+
+        Assert.Equal(await PackPromptSource.Instance.SystemAsync(pack, "gemma4:12b", default), await managed.SystemAsync(pack, "gemma4:12b", default));
+        Assert.Equal(await PackPromptSource.Instance.UserAsync(pack, document, default), await managed.UserAsync(pack, document, default));
+        if (pack.VlmUserTemplate is not null)
+            Assert.Equal(await PackPromptSource.Instance.VlmUserAsync(pack, document, issues, default), await managed.VlmUserAsync(pack, document, issues, default));
+        Assert.DoesNotContain("&quot;", await managed.UserAsync(pack, document, default));
+    }
+
     private static string Read(string path) => File.ReadAllText(path).Replace("\r\n", "\n");
 
     private static string FindRepo()
