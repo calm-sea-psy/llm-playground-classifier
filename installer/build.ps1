@@ -28,6 +28,7 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish 실패" }
 foreach ($must in 'Digitizer.exe', 'wwwroot\index.html', 'wwwroot\pdfjs\cmaps', 'packs\resume\type.json', 'packs\receipt\type.json') {
     if (-not (Test-Path (Join-Path $app $must))) { throw "게시 결과에 $must 가 없습니다" }
 }
+if (Test-Path (Join-Path $app 'package.json')) { throw '화면 소스(package.json)가 게시 결과에 섞였습니다' }
 $packs = Get-ChildItem (Join-Path $app 'packs') -Directory | ForEach-Object Name
 Write-Host "포함한 문서 종류: $($packs -join ', ')"
 

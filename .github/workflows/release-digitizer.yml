@@ -1,0 +1,67 @@
+# 문서 전산화 설치 파일 배포 (4차-exe 7단계): 태그 digitizer-v<버전> 을 올리면 Windows 러너가
+#   버전 확인 ➔ 테스트 ➔ 설치 파일 빌드 ➔ 릴리스 노트 · SHA-256 ➔ GitHub Releases
+# 모델 · OCR 은 설치 파일에 넣지 않음 (설치 도우미가 설치 때 내려받음). 태그 버전 = src/Digitizer.App 의 <Version>
+name: 문서 전산화 배포
+
+on:
+  push:
+    tags: ['digitizer-v*']
+
+permissions:
+  contents: write  # Releases 만들기
+
+jobs:
+  release:
+    name: 설치 파일 배포
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: powershell  # 설치 스크립트를 시험한 Windows PowerShell 5.1 과 같게
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/Digitizer.App/ClientApp/package-lock.json
+
+      - name: 태그 버전 = 프로그램 버전
+        run: |
+          $tag = "${{ github.ref_name }}" -replace '^digitizer-v', ''
+          $version = ([xml](Get-Content src/Digitizer.App/Digitizer.App.csproj -Raw -Encoding UTF8)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if ($tag -ne $version) { throw "태그 버전($tag)과 Digitizer.App.csproj 의 <Version>($version)이 다릅니다" }
+          Write-Host "버전 $version"
+
+      - name: 화면 린트
+        working-directory: src/Digitizer.App/ClientApp
+        run: |
+          npm ci
+          npm run lint
+
+      - name: 테스트 (평가 도구 · 설치판)
+        run: |
+          dotnet test tests/Api.Tests
+          if ($LASTEXITCODE -ne 0) { throw "평가 도구 테스트 실패" }
+          dotnet test tests/Digitizer.App.Tests
+          if ($LASTEXITCODE -ne 0) { throw "설치판 테스트 실패" }
+
+      - name: 설치 파일 빌드
+        run: |
+          ./installer/install-innosetup.ps1
+          ./installer/build.ps1
+
+      - name: 릴리스 노트 · 체크섬
+        run: ./installer/release-notes.ps1 -Repo "${{ github.server_url }}/${{ github.repository }}" -Ref "${{ github.ref_name }}"
+
+      - name: GitHub Releases 에 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $setup = Get-ChildItem installer/out -Filter 'DocumentDigitizer-setup-*.exe' | Select-Object -First 1
+          $version = "${{ github.ref_name }}" -replace '^digitizer-v', ''
+          gh release create "${{ github.ref_name }}" $setup.FullName "$($setup.FullName).sha256" `
+            --title "문서 전산화 $version" --notes-file installer/out/release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw "릴리스를 만들지 못했습니다" }
