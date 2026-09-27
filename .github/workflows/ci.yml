@@ -44,11 +44,15 @@ jobs:
       - name: 테스트 (합격한 팩 · 처리 코어 · 검수 · 엑셀 · 실행 형태)
         run: dotnet test tests/Digitizer.App.Tests --logger "console;verbosity=normal"
       # 설치 파일까지 빌드 (게시 ➔ OCR 배포 파일 ➔ Inno Setup). 게시 결과 검사(화면 · PDF 문자표 · 합격 팩 · 소스 섞임)는 build.ps1 안에
+      # 설치 스크립트는 이 PC 에서 시험한 Windows PowerShell 5.1 로 (powershell -File, 스크립트는 BOM 이 있어 한글 OK).
+      # 이 단계의 인라인 명령은 pwsh: GitHub 가 BOM 없이 임시 파일로 쓰는데 5.1 은 그 한글을 못 읽음 (첫 CI 실패)
       - name: 설치 파일 빌드
-        shell: powershell  # 이 PC 에서 시험한 Windows PowerShell 5.1 과 같게 (러너 기본값은 pwsh 7)
+        shell: pwsh
         run: |
-          ./installer/install-innosetup.ps1
-          ./installer/build.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File installer/install-innosetup.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup 설치 실패" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File installer/build.ps1
+          if ($LASTEXITCODE -ne 0) { throw "설치 파일 빌드 실패" }
           if (!(Test-Path installer/out/DocumentDigitizer-setup-*.exe)) { throw "설치 파일이 만들어지지 않았습니다" }
 
   web:

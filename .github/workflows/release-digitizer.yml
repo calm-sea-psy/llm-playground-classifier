@@ -1,6 +1,8 @@
 # 문서 전산화 설치 파일 배포 (4차-exe 7단계): 태그 digitizer-v<버전> 을 올리면 Windows 러너가
 #   버전 확인 ➔ 테스트 ➔ 설치 파일 빌드 ➔ 릴리스 노트 · SHA-256 ➔ GitHub Releases
 # 모델 · OCR 은 설치 파일에 넣지 않음 (설치 도우미가 설치 때 내려받음). 태그 버전 = src/Digitizer.App 의 <Version>
+# 인라인 명령은 pwsh (GitHub 가 BOM 없이 임시 파일로 쓰는데 Windows PowerShell 5.1 은 그 한글을 못 읽음),
+# 설치 스크립트는 이 PC 에서 시험한 Windows PowerShell 5.1 로 (powershell -File)
 name: 문서 전산화 배포
 
 on:
@@ -16,7 +18,7 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        shell: powershell  # 설치 스크립트를 시험한 Windows PowerShell 5.1 과 같게
+        shell: pwsh
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -39,7 +41,9 @@ jobs:
         working-directory: src/Digitizer.App/ClientApp
         run: |
           npm ci
+          if ($LASTEXITCODE -ne 0) { throw "npm ci 실패" }
           npm run lint
+          if ($LASTEXITCODE -ne 0) { throw "화면 린트 실패" }
 
       - name: 테스트 (평가 도구 · 설치판)
         run: |
@@ -50,11 +54,15 @@ jobs:
 
       - name: 설치 파일 빌드
         run: |
-          ./installer/install-innosetup.ps1
-          ./installer/build.ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File installer/install-innosetup.ps1
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup 설치 실패" }
+          powershell -NoProfile -ExecutionPolicy Bypass -File installer/build.ps1
+          if ($LASTEXITCODE -ne 0) { throw "설치 파일 빌드 실패" }
 
       - name: 릴리스 노트 · 체크섬
-        run: ./installer/release-notes.ps1 -Repo "${{ github.server_url }}/${{ github.repository }}" -Ref "${{ github.ref_name }}"
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File installer/release-notes.ps1 -Repo "${{ github.server_url }}/${{ github.repository }}" -Ref "${{ github.ref_name }}"
+          if ($LASTEXITCODE -ne 0) { throw "릴리스 노트를 만들지 못했습니다" }
 
       - name: GitHub Releases 에 올리기
         env:
