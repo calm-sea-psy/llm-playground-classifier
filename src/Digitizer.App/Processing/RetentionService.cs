@@ -4,14 +4,18 @@ using Microsoft.EntityFrameworkCore;
 namespace Digitizer.App.Processing;
 
 /// <summary>
-/// 보관 기한 (설정 RetentionDays, 기본 90일, 접수일 기준). 지난 문서는 원본 파일(처리됨 · 확인 필요 · 실패 폴더)과 실패 사유 파일을 지우고,
+/// 보관 기한 (설정 RetentionDays, 기본 90일, 0 = 지우지 않음, 접수한 때 기준, 1 = 1일(24시간)이 되면). 기한이 된 문서는 원본 파일(처리됨 · 확인 필요 · 실패 폴더)과 실패 사유 파일을 지우고,
 /// 내보낸 적 없는 건은 DB 기록도 모두 지움. 내보낸 건은 "언제 무엇을 내보냈는지" 기록만 남기고 원문 · 필드 값 · 고친 값은 비움.
-/// 처리 중 · 대기 중인 건은 건드리지 않음. 시작할 때 + 6시간마다
+/// 처리 중 · 대기 중인 건은 건드리지 않음.
+/// 엑셀 보관 기한 (설정 ExportRetentionDays, 기본 90일, 0 = 지우지 않음, 내보낸 때 기준): 기한이 되면 내보내기 폴더의 파일을 지우고 기록에 지운 때를 남김.
+/// 시작할 때 + 1시간마다 (기한 1일이면 1일 ~ 1일 1시간 사이에 지워짐)
 /// </summary>
 public sealed class RetentionService(IDbContextFactory<DigitizerDb> dbFactory, SettingsFile settings, FileRouter router, TimeProvider clock,
     ILogger<RetentionService> logger) : BackgroundService
 {
-    public sealed record Summary(int Deleted, int Cleared, int FilesDeleted);
+    public static readonly TimeSpan Interval = TimeSpan.FromHours(1);
+
+    public sealed record Summary(int Deleted, int Cleared, int FilesDeleted, int ExportsDeleted = 0);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -20,23 +24,26 @@ public sealed class RetentionService(IDbContextFactory<DigitizerDb> dbFactory, S
             try
             {
                 var s = await PurgeAsync(stoppingToken);
-                if (s.Deleted + s.Cleared > 0)
-                    logger.LogInformation("보관 기한 지남: 기록 삭제 {Deleted}건, 내보낸 건 값 비움 {Cleared}건, 파일 {Files}개 삭제", s.Deleted, s.Cleared, s.FilesDeleted);
+                if (s.Deleted + s.Cleared + s.ExportsDeleted > 0)
+                    logger.LogInformation("보관 기한 지남: 기록 삭제 {Deleted}건, 내보낸 건 값 비움 {Cleared}건, 파일 {Files}개 삭제, 엑셀 {Exports}개 삭제",
+                        s.Deleted, s.Cleared, s.FilesDeleted, s.ExportsDeleted);
             }
             catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
             {
                 logger.LogError(ex, "보관 기한 정리 오류");
             }
-            await Task.Delay(TimeSpan.FromHours(6), clock, stoppingToken);
+            await Task.Delay(Interval, clock, stoppingToken);
         }
     }
 
     public async Task<Summary> PurgeAsync(CancellationToken ct = default)
     {
-        var cutoff = clock.GetUtcNow().AddDays(-settings.Current.RetentionDays);
         await using var db = await dbFactory.CreateDbContextAsync(ct);
-        var expired = await db.Documents
-            .Where(d => d.ReceivedAt < cutoff && d.PurgedAt == null
+        var days = settings.Current.RetentionDays;
+        // 0 = 지우지 않음 (문서는 건너뛰고 엑셀 보관 기한만 봄). 기한 판정은 엑셀과 같게 "기한이 된 때부터" (<=)
+        var cutoff = days > 0 ? clock.GetUtcNow().AddDays(-days) : DateTimeOffset.MinValue;
+        List<DocumentRecord> expired = days <= 0 ? [] : await db.Documents
+            .Where(d => d.ReceivedAt <= cutoff && d.PurgedAt == null
                 && d.Status != DocumentStatus.Queued && d.Status != DocumentStatus.Processing)
             .Include(d => d.Extractions).Include(d => d.Corrections).AsSplitQuery()
             .ToListAsync(ct);
@@ -74,9 +81,28 @@ public sealed class RetentionService(IDbContextFactory<DigitizerDb> dbFactory, S
             doc.PurgedAt = clock.GetUtcNow();
             cleared++;
         }
+        var exports = await PurgeExportsAsync(db, ct);
         await db.SaveChangesAsync(ct);
         RemoveEmptyFolders();
-        return new Summary(deleted, cleared, files);
+        return new Summary(deleted, cleared, files, exports);
+    }
+
+    /// <summary>엑셀 보관 기한이 지난 내보내기 파일 지우기. 이미 없으면(사용자가 옮김 · 지움) 지운 것으로 표시, 못 지우면 다음 정리 때 다시</summary>
+    private async Task<int> PurgeExportsAsync(DigitizerDb db, CancellationToken ct)
+    {
+        var days = settings.Current.ExportRetentionDays;
+        if (days <= 0) return 0;  // 0 = 지우지 않음
+        var cutoff = clock.GetUtcNow().AddDays(-days);
+        var expired = await db.Exports.Where(e => e.DeletedAt == null && e.CreatedAt <= cutoff).ToListAsync(ct);
+        var deleted = 0;
+        foreach (var export in expired)
+        {
+            var files = 0;
+            if (!TryDelete(export.FilePath, ref files)) continue;
+            export.DeletedAt = clock.GetUtcNow();
+            deleted++;
+        }
+        return deleted;
     }
 
     private bool TryDelete(string path, ref int deleted)

@@ -15,8 +15,14 @@ public sealed record AppSettings
     /// <summary>사용자가 보는 폴더 (넣기 · 처리됨 · 확인 필요 · 실패 · 내보내기). 비어 있으면 문서\문서 전산화</summary>
     public string DocumentsRoot { get; init; } = "";
 
-    /// <summary>원본 · 원문 보관 기한 (일). 접수일로부터 지나면 지움 (RetentionService)</summary>
+    /// <summary>원본 · 원문 보관 기한 (일). 접수한 때로부터 이 기간이 되면 지움 (RetentionService). 0 = 지우지 않음 (개인정보가 계속 남음)</summary>
     public int RetentionDays { get; init; } = 90;
+
+    /// <summary>
+    /// 내보낸 엑셀 파일 보관 기한 (일). 내보낸 때로부터 이 기간이 되면 내보내기 폴더의 파일을 지움 (기록은 "지움" 으로 남김).
+    /// 0 = 지우지 않음. 엑셀은 다른 곳에 넘기는 결과물이라 원본 보관 기한과 따로 정함
+    /// </summary>
+    public int ExportRetentionDays { get; init; } = 90;
 
     /// <summary>설치 도우미가 사양에 맞춰 정함 (GPU 8GB+ gemma4:12b, 없으면 gemma-4-E4B)</summary>
     public string Model { get; init; } = "gemma4:12b";
@@ -74,7 +80,8 @@ public sealed record AppSettings
     public List<string> Problems()
     {
         var problems = new List<string>();
-        if (RetentionDays < 1) problems.Add("보관 기한은 1일 이상이어야 합니다");
+        if (RetentionDays < 0) problems.Add("보관 기한은 0(지우지 않음) 이상이어야 합니다");
+        if (ExportRetentionDays < 0) problems.Add("엑셀 보관 기한은 0(지우지 않음) 이상이어야 합니다");
         if (string.IsNullOrWhiteSpace(Model)) problems.Add("모델이 비어 있습니다");
         if (FallbackConfidence is < 0 or > 1) problems.Add("폴백 신뢰도 기준은 0~1 사이여야 합니다");
         if (!Uri.TryCreate(OllamaUrl, UriKind.Absolute, out _)) problems.Add($"Ollama 주소가 올바르지 않습니다: {OllamaUrl}");

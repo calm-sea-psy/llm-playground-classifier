@@ -9,10 +9,12 @@ export function ExportPage({ packs }: { packs: Pack[] }) {
   const [history, setHistory] = useState<History>([])
   const [busy, setBusy] = useState<string | null>(null)
   const [message, setMessage] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null)
+  const [exportDays, setExportDays] = useState<number | null>(null)
 
   const load = useCallback(() => {
     api.pendingExports().then(setPending, (e: Error) => setMessage({ tone: 'bad', text: e.message }))
     api.exports().then(setHistory, () => {})
+    api.settings().then((s) => setExportDays(s.settings.exportRetentionDays), () => {})
   }, [])
   useEffect(load, [load])
 
@@ -37,7 +39,8 @@ export function ExportPage({ packs }: { packs: Pack[] }) {
     <section className="narrow">
       <h2>엑셀 내보내기</h2>
       <p className="muted">
-        승인한 문서와, 합격 종류(영수증)에서 검증을 통과한 문서만 내보냅니다. 조건부 합격 종류(이력서)는 승인한 문서만. 파일은 문서 폴더의 <b>내보내기</b> 에도 남습니다.
+        승인한 문서와, 합격 종류(영수증)에서 검증을 통과한 문서만 내보냅니다. 조건부 합격 종류(이력서)는 승인한 문서만. 파일은 문서 폴더의 <b>내보내기</b> 에도 남고,
+        {exportDays === null ? '' : exportDays === 0 ? ' 자동으로 지우지 않습니다.' : ` ${exportDays}일이 지나면 지웁니다 (설정의 엑셀 보관 기한).`}
       </p>
       {message && <p className={message.tone === 'ok' ? 'ok-text' : 'error'}>{message.text}</p>}
       <div className="cards">
@@ -75,7 +78,15 @@ export function ExportPage({ packs }: { packs: Pack[] }) {
               <tr key={h.id}>
                 <td className="time">{formatTime(h.createdAt)}</td>
                 <td>{packName(h.packId)}</td>
-                <td>{h.exists ? <a href={`/api/exports/${h.id}/file`}>{h.fileName}</a> : <span className="muted">{h.fileName} (없음)</span>}</td>
+                <td>
+                  {h.deletedAt ? (
+                    <span className="muted">{h.fileName} (보관 기한이 지나 {formatTime(h.deletedAt)} 에 지움)</span>
+                  ) : h.exists ? (
+                    <a href={`/api/exports/${h.id}/file`}>{h.fileName}</a>
+                  ) : (
+                    <span className="muted">{h.fileName} (없음: 옮기거나 지움)</span>
+                  )}
+                </td>
                 <td className="num">{h.documentCount}</td>
               </tr>
             ))}

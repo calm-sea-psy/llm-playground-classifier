@@ -115,6 +115,8 @@ public sealed class ExportRecord
     public required string FilePath { get; set; }
     public int DocumentCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>엑셀 보관 기한(ExportRetentionDays)이 지나 파일을 지운 때</summary>
+    public DateTimeOffset? DeletedAt { get; set; }
 }
 
 public sealed class DigitizerDb(DbContextOptions<DigitizerDb> options) : DbContext(options)

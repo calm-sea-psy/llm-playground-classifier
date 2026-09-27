@@ -45,7 +45,7 @@ public sealed class ProcessingCoreTests
             Assert.Equal(0.9, file.Current.FallbackConfidence);  // 측정한 기본값
             Assert.Contains("\"VlmMaxImageSide\": 1600", File.ReadAllText(path));
 
-            Assert.Throws<ArgumentException>(() => file.Save(file.Current with { RetentionDays = 0 }));
+            Assert.Throws<ArgumentException>(() => file.Save(file.Current with { RetentionDays = -1 }));
             Assert.Equal(30, new SettingsFile(path).Current.RetentionDays);
         }
         finally
@@ -328,7 +328,8 @@ public sealed class ProcessingCoreTests
         h.Clock.Advance(TimeSpan.FromDays(2));  // 앞의 3건은 91일
         var summary = await h.Retention.PurgeAsync();
 
-        Assert.Equal(new RetentionService.Summary(Deleted: 2, Cleared: 1, FilesDeleted: 4), summary);  // 원본 3 + 실패 사유 1
+        // 원본 3 + 실패 사유 1, 내보낸 기록(x.xlsx, 파일 없음)도 엑셀 보관 기한(90일)이 지나 지운 것으로 표시
+        Assert.Equal(new RetentionService.Summary(Deleted: 2, Cleared: 1, FilesDeleted: 4, ExportsDeleted: 1), summary);
         Assert.False(File.Exists(kept.StoredPath));
         Assert.False(File.Exists(dropped.StoredPath));
         Assert.False(File.Exists(failed.StoredPath + FileRouter.ReasonSuffix));

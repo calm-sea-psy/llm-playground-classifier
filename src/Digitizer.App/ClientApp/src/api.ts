@@ -75,6 +75,7 @@ export type DocumentDetail = {
 export type Settings = {
   documentsRoot: string
   retentionDays: number
+  exportRetentionDays: number
   model: string
   [key: string]: unknown
 }
@@ -120,7 +121,7 @@ export const api = {
     request<{ name: string; id: number | null; status: DocumentStatus; statusReason: string | null }[]>('POST', '/api/upload', form),
   pendingExports: () => request<{ packId: string; displayName: string; notExported: number; exported: number }[]>('GET', '/api/exports/pending'),
   exports: () =>
-    request<{ id: number; packId: string; fileName: string; documentCount: number; createdAt: string; exists: boolean }[]>('GET', '/api/exports'),
+    request<{ id: number; packId: string; fileName: string; documentCount: number; createdAt: string; deletedAt: string | null; exists: boolean }[]>('GET', '/api/exports'),
   exportPack: (packId: string, includeExported: boolean) =>
     request<{ id: number; fileName: string; documentCount: number }>('POST', '/api/exports', { packId, includeExported }),
   corrections: () =>
@@ -137,7 +138,7 @@ export const api = {
     }[]>('GET', '/api/stats/corrections'),
   settings: () =>
     request<{ autoStart: boolean; settings: Settings; resolvedDocumentsRoot: string; availableModels: string[] | null; settingsPath: string }>('GET', '/api/settings'),
-  saveSettings: (body: { documentsRoot?: string; retentionDays?: number; model?: string; autoStart?: boolean }) =>
+  saveSettings: (body: { documentsRoot?: string; retentionDays?: number; exportRetentionDays?: number; model?: string; autoStart?: boolean }) =>
     request<{ autoStart: boolean; settings: Settings; resolvedDocumentsRoot: string }>('PUT', '/api/settings', body),
   queue: () => request<{ paused: boolean; queued: number; processing: number }>('GET', '/api/queue'),
   setPaused: (paused: boolean) => request<{ paused: boolean }>('POST', paused ? '/api/queue/pause' : '/api/queue/resume'),

@@ -158,7 +158,7 @@ public static class Endpoints
         {
             await using var db = await f.CreateDbContextAsync();
             var exports = await db.Exports.AsNoTracking().OrderByDescending(e => e.Id).Take(100).ToListAsync();
-            return exports.Select(e => new { e.Id, e.PackId, FileName = Path.GetFileName(e.FilePath), e.DocumentCount, e.CreatedAt, Exists = File.Exists(e.FilePath) });
+            return exports.Select(e => new { e.Id, e.PackId, FileName = Path.GetFileName(e.FilePath), e.DocumentCount, e.CreatedAt, e.DeletedAt, Exists = File.Exists(e.FilePath) });
         });
 
         api.MapPost("/exports", async (ExportRequest request, ExcelExporter exporter) => await Guard(async () =>
@@ -171,6 +171,7 @@ public static class Endpoints
         {
             await using var db = await f.CreateDbContextAsync();
             var e = await db.Exports.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id);
+            if (e?.DeletedAt is not null) return Results.NotFound(new { error = "엑셀 보관 기한이 지나 지운 파일입니다 (필요하면 내보내기 화면의 [전체 다시] 로 다시 만듦)" });
             return e is null || !File.Exists(e.FilePath)
                 ? Results.NotFound(new { error = "내보낸 파일이 없습니다 (옮기거나 지웠을 수 있음)" })
                 : Results.File(e.FilePath, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Path.GetFileName(e.FilePath));
@@ -238,6 +239,7 @@ public static class Endpoints
             {
                 DocumentsRoot = change.DocumentsRoot?.Trim() ?? settings.Current.DocumentsRoot,
                 RetentionDays = change.RetentionDays ?? settings.Current.RetentionDays,
+                ExportRetentionDays = change.ExportRetentionDays ?? settings.Current.ExportRetentionDays,
                 Model = change.Model?.Trim() ?? settings.Current.Model,
             };
             if (next.DocumentsRoot.Length > 0 && !Path.IsPathFullyQualified(next.DocumentsRoot))
@@ -265,8 +267,8 @@ public static class Endpoints
 
     public sealed record ExportRequest(string PackId, bool IncludeExported = false);
 
-    /// <summary>설정 화면에서 바꿀 수 있는 것 (나머지 처리 설정은 측정한 값 그대로, 파일에서만)</summary>
-    public sealed record SettingsChange(string? DocumentsRoot, int? RetentionDays, string? Model, bool? AutoStart);
+    /// <summary>설정 화면에서 바꿀 수 있는 것 (나머지 처리 설정은 측정한 값 그대로, 파일에서만). ExportRetentionDays: 0 = 엑셀을 지우지 않음</summary>
+    public sealed record SettingsChange(string? DocumentsRoot, int? RetentionDays, string? Model, bool? AutoStart, int? ExportRetentionDays = null);
 
     private static DateTimeOffset LocalStart(DateOnly day) =>
         new(day.ToDateTime(TimeOnly.MinValue), TimeZoneInfo.Local.GetUtcOffset(day.ToDateTime(TimeOnly.MinValue)));

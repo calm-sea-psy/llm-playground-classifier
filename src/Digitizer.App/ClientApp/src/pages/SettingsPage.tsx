@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { api, type Pack } from '../api.ts'
 
-// 사용자가 바꿀 수 있는 것: 모델 · 문서 폴더 · 보관 기한. 나머지 처리 설정은 측정한 값 그대로 (설정 파일에서만)
+// 사용자가 바꿀 수 있는 것: 모델 · 문서 폴더 · 보관 기한 · 엑셀 보관 기한 · 자동 시작. 나머지 처리 설정은 측정한 값 그대로 (설정 파일에서만)
 export function SettingsPage({ packs }: { packs: Pack[] }) {
   const [model, setModel] = useState('')
   const [root, setRoot] = useState('')
   const [resolved, setResolved] = useState('')
   const [days, setDays] = useState(90)
+  const [exportDays, setExportDays] = useState(90)
   const [autoStart, setAutoStart] = useState(false)
   const [models, setModels] = useState<string[] | null>(null)
   const [path, setPath] = useState('')
@@ -20,6 +21,7 @@ export function SettingsPage({ packs }: { packs: Pack[] }) {
         setRoot(s.settings.documentsRoot)
         setResolved(s.resolvedDocumentsRoot)
         setDays(s.settings.retentionDays)
+        setExportDays(s.settings.exportRetentionDays)
         setAutoStart(s.autoStart)
         setModels(s.availableModels)
         setPath(s.settingsPath)
@@ -32,7 +34,7 @@ export function SettingsPage({ packs }: { packs: Pack[] }) {
     setBusy(true)
     setMessage(null)
     try {
-      const r = await api.saveSettings({ model, documentsRoot: root, retentionDays: days, autoStart })
+      const r = await api.saveSettings({ model, documentsRoot: root, retentionDays: days, exportRetentionDays: exportDays, autoStart })
       setResolved(r.resolvedDocumentsRoot)
       setAutoStart(r.autoStart)
       setMessage({ tone: 'ok', text: '저장했습니다. 다음 문서부터 적용됩니다' })
@@ -72,8 +74,21 @@ export function SettingsPage({ packs }: { packs: Pack[] }) {
         </label>
         <label className="field">
           <span className="label">보관 기한 (일)</span>
-          <input type="number" min={1} value={days} onChange={(e) => setDays(Number(e.target.value))} />
-          <span className="hint muted">접수일로부터 지나면 원본 · 원문을 지웁니다. 내보낸 문서는 기록만 남습니다</span>
+          <input type="number" min={0} value={days} onChange={(e) => setDays(Number(e.target.value))} />
+          {days === 0 ? (
+            <span className="hint warn-text">0: 원본 · 원문을 지우지 않습니다 (개인정보가 계속 남음)</span>
+          ) : (
+            <span className="hint muted">접수한 때로부터 {days}일이 되면 원본 · 원문을 지웁니다 (1시간마다 확인). 내보낸 문서는 기록만 남습니다. 0 이면 지우지 않음</span>
+          )}
+        </label>
+        <label className="field">
+          <span className="label">엑셀 보관 기한 (일)</span>
+          <input type="number" min={0} value={exportDays} onChange={(e) => setExportDays(Number(e.target.value))} />
+          <span className="hint muted">
+            {exportDays === 0
+              ? '0: 내보낸 엑셀 파일을 지우지 않습니다 (직접 관리)'
+              : `내보낸 때로부터 ${exportDays}일이 되면 내보내기 폴더의 엑셀 파일을 지웁니다 (1시간마다 확인). 0 이면 지우지 않음`}
+          </span>
         </label>
         <label className="check">
           <input type="checkbox" checked={autoStart} onChange={(e) => setAutoStart(e.target.checked)} />
