@@ -69,6 +69,8 @@ public sealed class RetentionService(IDbContextFactory<DigitizerDb> dbFactory, S
                 c.CorrectedValue = null;
             }
             doc.StatusReason = null;  // 중복 사유에 다른 문서 파일 이름이 들어 있음
+            doc.ReviewedFields = null;
+            doc.ReviewNote = null;
             doc.PurgedAt = clock.GetUtcNow();
             cleared++;
         }

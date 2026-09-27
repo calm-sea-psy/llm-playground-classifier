@@ -10,13 +10,22 @@
     <!-- CI(ubuntu)에서도 빌드만은 되게. 실행 · 설치 파일은 Windows 전용 -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <PacksRoot>$(MSBuildThisFileDirectory)..\..\packs\</PacksRoot>
+    <ClientAppDir>$(MSBuildThisFileDirectory)ClientApp\</ClientAppDir>
+    <DefaultItemExcludes>$(DefaultItemExcludes);ClientApp\node_modules\**;ClientApp\dist\**</DefaultItemExcludes>
   </PropertyGroup>
+
+  <!-- 화면 소스(package.json · tsconfig 등)가 출력 · 게시 폴더에 섞이지 않게 -->
+  <ItemGroup>
+    <Content Remove="ClientApp\**" />
+    <None Remove="ClientApp\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Digitizer.Engine\Digitizer.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.105.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
@@ -38,6 +47,26 @@
       <Content Include="@(_ReleasedPackFile)" Link="packs\$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('%(FullPath)'))))\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     </ItemGroup>
     <Message Importance="high" Text="합격 표시가 없어 exe 에 넣지 않는 팩: @(_SkippedPack, ', ')" Condition="'@(_SkippedPack)' != ''" />
+  </Target>
+
+  <!--
+    화면(ClientApp, Vite + React): 소스가 dist 보다 새로우면 npm 으로 빌드하고, dist 를 출력 · 게시 폴더의 wwwroot 로 복사.
+    Node.js 가 없는 곳에서 서버만 빌드하려면 -p:SkipClientApp=true (화면 없이 API 만)
+  -->
+  <ItemGroup>
+    <_ClientAppInput Include="ClientApp\src\**;ClientApp\index.html;ClientApp\package.json;ClientApp\vite.config.ts;ClientApp\public\**" />
+  </ItemGroup>
+  <Target Name="BuildClientApp" BeforeTargets="AssignTargetPaths" Condition="'$(SkipClientApp)' != 'true'"
+          Inputs="@(_ClientAppInput)" Outputs="$(ClientAppDir)dist\index.html">
+    <Exec Command="npm ci" WorkingDirectory="$(ClientAppDir)" Condition="!Exists('$(ClientAppDir)node_modules')" />
+    <Exec Command="npm run build" WorkingDirectory="$(ClientAppDir)" />
+  </Target>
+  <Target Name="IncludeClientApp" AfterTargets="BuildClientApp" BeforeTargets="AssignTargetPaths" Condition="'$(SkipClientApp)' != 'true'">
+    <ItemGroup>
+      <_ClientAppFile Include="$(ClientAppDir)dist\**" />
+      <Content Include="@(_ClientAppFile)" Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
+               CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    </ItemGroup>
   </Target>
 
 </Project>

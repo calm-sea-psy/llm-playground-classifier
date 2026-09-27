@@ -20,6 +20,16 @@ public sealed record AppSettings
 
     /// <summary>설치 도우미가 사양에 맞춰 정함 (GPU 8GB+ gemma4:12b, 없으면 gemma-4-E4B)</summary>
     public string Model { get; init; } = "gemma4:12b";
+
+    /// <summary>
+    /// 팩별로 합격 판정에 쓴 모델 (docs/pack_reports.md: 이력서 gemma4:12b · E4B, 영수증 KORIE 는 gemma4:12b 만).
+    /// 다른 모델도 쓸 수 있지만 측정한 결과와 달라질 수 있음 ➔ 설정 화면이 경고
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string[]> MeasuredModels = new Dictionary<string, string[]>
+    {
+        ["resume"] = ["gemma4:12b", "hf.co/unsloth/gemma-4-E4B-it-GGUF:Q4_K_M"],
+        ["receipt"] = ["gemma4:12b"],
+    };
     public bool CpuOnly { get; init; }
     public string OllamaUrl { get; init; } = "http://127.0.0.1:11434";
     public string OcrUrl { get; init; } = "http://127.0.0.1:8001";

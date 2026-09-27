@@ -35,6 +35,15 @@ public sealed record PackRelease(
     public const string Conditional = "conditional";
 }
 
+/// <summary>엑셀 시트 1장: Fields = 맨 위 필드 (문서 1건 = 1행) 또는 List = 목록 필드 (항목 1개 = 1행)</summary>
+public sealed record ExcelSheet(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("fields")] List<string>? Fields = null,
+    [property: JsonPropertyName("list")] string? List = null);
+
+/// <summary>엑셀 내보내기 시트 구성 (exe). 없으면 맨 위 필드 1장 + 목록 필드마다 1장</summary>
+public sealed record ExcelDef([property: JsonPropertyName("sheets")] List<ExcelSheet> Sheets);
+
 /// <summary>
 /// 문서 종류 팩 (packs/{id}/). 엔진은 이 정의만 보고 동작하고 종류별 코드는 두지 않는다.
 /// 새 종류 = 팩 추가 ➔ 평가 도구에서 측정 ➔ 기준을 넘으면 exe 에 포함
@@ -59,6 +68,9 @@ public sealed partial record DocumentType(
 
     /// <summary>없으면 평가 도구에서만 씀 (exe 에 넣지 않음)</summary>
     [JsonPropertyName("release")] public PackRelease? Release { get; init; }
+
+    /// <summary>엑셀 내보내기 시트 구성 (추출 · 검증에는 쓰지 않음)</summary>
+    [JsonPropertyName("excel")] public ExcelDef? Excel { get; init; }
 
     /// <summary>프롬프트 틀의 {{$이름}} 에 넣을 값 (예: 영수증 amount_rule)</summary>
     [JsonPropertyName("variables")] public Dictionary<string, string> Variables { get; init; } = [];

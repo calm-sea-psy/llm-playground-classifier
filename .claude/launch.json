@@ -52,7 +52,7 @@
       ],
       "port": 5310,
       "env": {
-        "DIGITIZER_DATA": "data/digitizer-app"
+        "DIGITIZER_DATA": "../../data/digitizer-app"
       }
     },
     {

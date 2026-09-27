@@ -14,7 +14,7 @@ public sealed class AppPaths(string dataRoot)
     public string Queue => Path.Combine(DataRoot, "queue");
 
     public static AppPaths Default() => new(Environment.GetEnvironmentVariable("DIGITIZER_DATA") is { Length: > 0 } custom
-        ? custom
+        ? Path.GetFullPath(custom)  // 상대 경로는 실행 위치 기준 (dotnet run 은 프로젝트 폴더)
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Digitizer"));
 }
 

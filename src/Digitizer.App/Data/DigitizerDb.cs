@@ -2,7 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Digitizer.App.Data;
 
-/// <summary>문서 상태. 검수(승인 · 반려)는 3단계 화면에서 추가</summary>
+/// <summary>문서 상태. 내보내기 대상 = Approved + (합격 팩의) Processed</summary>
 public enum DocumentStatus
 {
     /// <summary>접수, 처리 대기 (원본은 데이터 폴더 queue\)</summary>
@@ -16,6 +16,10 @@ public enum DocumentStatus
     Failed,
     /// <summary>같은 종류로 같은 내용을 이미 접수함 (실패 폴더 + 사유 .txt, 처리하지 않음)</summary>
     Duplicate,
+    /// <summary>검수 화면에서 승인 (처리됨 폴더). 조건부 팩은 이 길로만 내보내기 대상이 됨</summary>
+    Approved,
+    /// <summary>검수 화면에서 반려 (실패 폴더 + 사유 .txt, 내보내지 않음)</summary>
+    Rejected,
 }
 
 /// <summary>접수한 문서 1건 (원본 파일 기준)</summary>
@@ -44,6 +48,15 @@ public sealed class DocumentRecord
     /// <summary>보관 기한이 지나 원본 · 원문 · 필드 값을 지운 때 (내보낸 건만 기록이 남음)</summary>
     public DateTimeOffset? PurgedAt { get; set; }
     public long? LastExportId { get; set; }
+
+    /// <summary>검수에서 저장한 필드 JSON (없으면 추출값 그대로). 내보내기는 이 값을 씀</summary>
+    public string? ReviewedFields { get; set; }
+    /// <summary>검수 저장 · 승인 · 반려 시각</summary>
+    public DateTimeOffset? ReviewedAt { get; set; }
+    /// <summary>반려 사유 등 검수 메모</summary>
+    public string? ReviewNote { get; set; }
+    /// <summary>검수 때 비교한 칸 수 (수정률의 분모, 보관 기한이 지나 값을 지워도 남음)</summary>
+    public int? ReviewedSlots { get; set; }
 
     public List<ExtractionRecord> Extractions { get; set; } = [];
     public List<CorrectionRecord> Corrections { get; set; } = [];

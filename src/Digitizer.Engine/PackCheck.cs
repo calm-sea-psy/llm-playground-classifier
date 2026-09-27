@@ -63,6 +63,17 @@ public static partial class PackCheck
                 errors.Add("조건부 합격(conditional)은 조건(release.conditions)을 하나 이상 적어야 합니다");
         }
 
+        foreach (var sheet in type.Excel?.Sheets ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(sheet.Name)) errors.Add("엑셀 시트 이름이 비었습니다");
+            if ((sheet.Fields is null) == (sheet.List is null)) errors.Add($"엑셀 시트 {sheet.Name}: fields 와 list 중 하나만 적어야 합니다");
+            foreach (var name in sheet.Fields ?? [])
+                if (type.Fields?.FirstOrDefault(f => f.Name == name) is not { } field || field.Type == "list")
+                    errors.Add($"엑셀 시트 {sheet.Name}: {name} 은(는) 맨 위 필드가 아닙니다");
+            if (sheet.List is { } list && type.Fields?.FirstOrDefault(f => f.Name == list)?.Type != "list")
+                errors.Add($"엑셀 시트 {sheet.Name}: {list} 은(는) 목록(list) 필드가 아닙니다");
+        }
+
         foreach (var fb in type.Forbidden ?? [])
         {
             if (string.IsNullOrWhiteSpace(fb.Id) || string.IsNullOrWhiteSpace(fb.Label)) errors.Add("수집 금지 항목의 id · 이름이 비었습니다");

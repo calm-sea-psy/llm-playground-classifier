@@ -1,10 +1,18 @@
+using System.Text.Json.Serialization;
 using Digitizer.App;
+using Digitizer.App.Api;
 using Digitizer.App.Data;
 using Digitizer.App.Processing;
+using Digitizer.App.Status;
 using Microsoft.EntityFrameworkCore;
 
-// 2단계: 처리 코어 (설정 파일 · SQLite · 대기열 · 감시 폴더 · 파일 이동 · 보관 기한). 화면(3단계) · 트레이(4단계)는 이후 단계
-var builder = WebApplication.CreateBuilder(args);
+// 처리 코어(2단계) + 화면 · API(3단계). 트레이 · 자식 프로세스(4단계)는 이후 단계
+// 화면 파일은 실행 폴더의 wwwroot (빌드가 ClientApp\dist 를 복사, dotnet run 에서도 같은 곳)
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+{
+    Args = args,
+    WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+});
 builder.WebHost.UseUrls(builder.Configuration["Urls"] ?? "http://127.0.0.1:5310");
 
 var paths = AppPaths.Default();
@@ -27,6 +35,8 @@ builder.Services.AddHttpClient(OcrSourceReader.OllamaClient, c =>
     c.Timeout = TimeSpan.FromSeconds(settings.LlmTimeoutSeconds);
 });
 builder.Services.AddSingleton<ISourceReader, OcrSourceReader>();
+builder.Services.AddSingleton<SystemCheck>();
+builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSingleton(sp => DocumentRunner.OllamaExtractors(sp.GetRequiredService<IHttpClientFactory>()));
 builder.Services.AddHostedService(sp => sp.GetRequiredService<ProcessingQueue>());
 builder.Services.AddHostedService<FolderWatcher>();
@@ -43,21 +53,10 @@ await using (var db = await app.Services.GetRequiredService<IDbContextFactory<Di
     await db.Database.MigrateAsync();
 }
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
-app.MapGet("/api/packs", (PackCatalog c) => c.Packs.Select(p => new
-{
-    p.Id,
-    p.Version,
-    p.DisplayName,
-    p.Description,
-    p.Release,
-}));
-// 3단계 화면 전까지 확인용: 최근 문서 (값 없이 상태만)
-app.MapGet("/api/documents", async (IDbContextFactory<DigitizerDb> f) =>
-{
-    await using var db = await f.CreateDbContextAsync();
-    var docs = await db.Documents.AsNoTracking().OrderByDescending(d => d.Id).Take(100).ToListAsync();
-    return docs.Select(d => new { d.Id, d.PackId, d.PackVersion, d.OriginalName, Status = d.Status.ToString(), d.StatusReason, d.TypeWarning, d.ReceivedAt, d.ProcessedAt });
-});
+app.UseMiddleware<LocalOnly>();
+app.UseDefaultFiles();
+app.UseStaticFiles();  // ClientApp 빌드 결과 (wwwroot)
+app.MapDigitizerApi();
+app.MapFallbackToFile("index.html");
 
 app.Run();

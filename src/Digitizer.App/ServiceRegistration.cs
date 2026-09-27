@@ -1,5 +1,7 @@
 using Digitizer.App.Data;
+using Digitizer.App.Export;
 using Digitizer.App.Processing;
+using Digitizer.App.Review;
 using Microsoft.EntityFrameworkCore;
 
 namespace Digitizer.App;
@@ -18,6 +20,8 @@ public static class ServiceRegistration
         services.AddSingleton<DocumentRunner>();
         services.AddSingleton<ProcessingQueue>();
         services.AddSingleton<DocumentIntake>();
+        services.AddSingleton<ReviewService>();
+        services.AddSingleton<ExcelExporter>();
         return services;
     }
 }
