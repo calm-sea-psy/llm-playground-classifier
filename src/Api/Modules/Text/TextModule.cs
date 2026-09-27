@@ -44,6 +44,7 @@ public sealed class TextModule : IPipelineModule
         services.AddScoped<TextPrompts>();
         services.AddScoped<TextPipeline>();
         services.AddSingleton<PackStore>();
+        services.AddSingleton<Release.ReleaseBuilder>();
         services.AddHttpClient(TextPipeline.EngineHttpClient, (sp, http) =>
         {
             var llm = sp.GetRequiredService<IOptions<LlmOptions>>().Value;
@@ -108,6 +109,9 @@ public sealed class TextModule : IPipelineModule
         // 문서 종류 팩 목록 (문서 처리의 종류 선택 · 결과 화면의 칸 이름 · 문서 종류 화면)
         group.MapGet("/packs", (PackStore packs) => packs.All().Select(PackDto.From));
         PackEndpoints.Map(group.MapGroup("/packs"));
+
+        // 배포 화면 (설치판에 들어가는 것이 전부 이 모듈): 점검 · 설치 파일 만들기 · 릴리스 노트
+        Release.ReleaseEndpoints.Map(group.MapGroup("/release"));
 
         // OCR 결과 원본 (OcrService 응답과 같은 형식)
         group.MapGet("/jobs/{id:guid}/ocr", async (Guid id, AppDbContext db, CancellationToken ct) =>

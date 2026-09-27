@@ -56,7 +56,7 @@ public static class PackEndpoints
     }
 
     /// <summary>이 팩이 문서 처리에서 쓰는 프롬프트(extract.{id} · 모델 전용 · 공용 user 틀) 중 DB 버전이 적용 중인 것</summary>
-    private static async Task<List<PromptOverride>> OverridesAsync(AppDbContext db, string id, CancellationToken ct) =>
+    public static async Task<List<PromptOverride>> OverridesAsync(AppDbContext db, string id, CancellationToken ct) =>
         await db.Set<PromptVersion>()
             .Where(p => p.Module == TextModule.ModuleKey && p.Active
                 && (p.Name == $"extract.{id}" || p.Name.StartsWith($"extract.{id}.") || p.Name == "extract.user" || p.Name == "extract.vlm.user"))

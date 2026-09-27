@@ -3,11 +3,12 @@ import { NotFound } from '../../shared/components/NotFound'
 import { ComparePage } from './pages/ComparePage'
 import { ExperimentPage } from './pages/ExperimentPage'
 import { PacksRoutes } from './pages/PacksPage'
+import { ReleasePage } from './pages/ReleasePage'
 import { TextHomePage } from './pages/TextHomePage'
 import { TextJobPage } from './pages/TextJobPage'
 
 /**
- * Step 1 화면: 모델 비교(첫 메뉴, /text) ➔ 문서 처리(/text/process) ➔ 문서 종류 팩 관리(/text/packs).
+ * Step 1 화면: 모델 비교(첫 메뉴, /text) ➔ 문서 처리(/text/process) ➔ 문서 종류 팩 관리(/text/packs) ➔ 배포(/text/release, 설치판).
  * 와일드카드 라우트(/text/*) 안의 상대 경로 "."는 현재 URL 기준이라 링크는 절대 경로로 쓴다
  */
 export function TextRoutes() {
@@ -15,6 +16,7 @@ export function TextRoutes() {
   const inCompare = pathname === '/text' || pathname === '/text/' || pathname.startsWith('/text/experiments')
   const inProcess = pathname.startsWith('/text/process') || pathname.startsWith('/text/jobs')
   const inPacks = pathname.startsWith('/text/packs')
+  const inRelease = pathname.startsWith('/text/release')
 
   return (
     <>
@@ -28,6 +30,9 @@ export function TextRoutes() {
         <NavLink to="/text/packs" className={inPacks ? 'active' : undefined}>
           문서 종류
         </NavLink>
+        <NavLink to="/text/release" className={inRelease ? 'active' : undefined}>
+          배포
+        </NavLink>
       </nav>
       <Routes>
         <Route index element={<ComparePage />} />
@@ -35,6 +40,7 @@ export function TextRoutes() {
         <Route path="process" element={<TextHomePage />} />
         <Route path="jobs/:jobId" element={<TextJobPage />} />
         <Route path="packs/*" element={<PacksRoutes />} />
+        <Route path="release" element={<ReleasePage />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </>

@@ -64,6 +64,20 @@
 - **새 문서 종류**: 빈 정의에서 시작하거나, 기존 종류를 **복사해서** 시작합니다. 새 종류는 자동 분류 대상이 아니라서 문서 처리에서 직접 고릅니다.
 - 고친 뒤에는 다시 측정해서 기준을 넘는지 확인하세요. 새 규칙이 필요하면 코드(`Digitizer.Engine/Rules/RuleRegistry`)를 추가해야 합니다.
 
+## 문서 텍스트 추출 ➔ 배포 (`/text/release`)
+
+평가에서 합격한 문서 종류를 [문서 전산화 설치판](digitizer.md)으로 내보내는 화면입니다. 설치판에 들어가는 것(Engine · 문서 종류 팩 · OCR)이 전부 문서 텍스트 추출 기능이라 이 메뉴 아래에 있습니다.
+
+- **이번 설치판에 들어가는 문서 종류**: 프로그램 버전(`src/Digitizer.App/Digitizer.App.csproj` 의 `<Version>`), 종류마다 팩 버전 · 판정(합격 / 조건부 합격 / 평가만) · 조건 · 측정 보고서. 합격 표시가 없는 종류는 넣지 않습니다.
+- **배포 전 점검** (정상 · 주의 · 문제, 해결 방법과 함께)
+  - 팩 검사, 프롬프트 관리에서 고친 문장이 적용 중인지 (설치판은 팩 파일 문장을 씀 ➔ 측정 결과와 달라짐)
+  - OCR 버전 고정 목록(`installer/ocr-constraints.txt`)이 측정 환경(`src/OcrService/.venv`)과 같은지
+  - Inno Setup 이 있는지, 커밋 · 푸시하지 않은 변경, 같은 버전 태그가 이미 있는지
+  - 최근 설치판 결과 대조 (`eval/digitizer/AppParity`): 원문 · 필드 · 검증 · 최종 출처가 같은 건수와 처리 시간
+- **설치 파일 만들기**: 이 PC 에서 `installer\build.ps1` 과 `release-notes.ps1` 을 실행하고 진행 로그를 보여 줍니다 (1~5분, 한 번에 하나). 끝나면 설치 파일 · `.sha256` · 릴리스 노트를 내려받을 수 있습니다. 이 PC(127.0.0.1)에서 연 화면에서만 됩니다.
+- **릴리스 노트 미리 보기**: GitHub Releases 에 올라갈 내용 그대로입니다.
+- **GitHub 에 배포**: 공개 저장소에 올리는 일이라 버튼으로 하지 않고 명령(`git push` ➔ `git tag digitizer-v<버전>` ➔ `git push origin digitizer-v<버전>`)을 복사해 직접 실행합니다. 태그가 올라가면 GitHub Actions 가 다시 빌드 · 테스트해 Releases 에 올립니다 ([installer/README.md](../installer/README.md)).
+
 ## CNN + VLM 판독 ➔ 모델 비교 (`/image`)와 실험 상세 (`/image/experiments/{id}`)
 
 ![이미지 실험 상세 — 조합별 결과](images/xray-experiment.png)

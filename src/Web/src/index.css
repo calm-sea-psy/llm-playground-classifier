@@ -1691,3 +1691,49 @@ label.pack-check {
 .pack-release ul {
   margin: 0.2rem 0;
 }
+
+/* 배포 화면 (/text/release) */
+.release {
+  display: grid;
+  gap: 1rem;
+}
+.release h3 {
+  margin: 1rem 0 0.5rem;
+}
+.release .page-head h3 {
+  margin: 0;
+}
+.release-checks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+.release-checks li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.release-log,
+.release-notes {
+  max-height: 22rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 0.8rem;
+  background: var(--surface-2, rgba(127, 127, 127, 0.08));
+  padding: 0.6rem 0.8rem;
+  border-radius: 8px;
+}
+.release-files {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 0.6rem;
+}
+.release-files code {
+  word-break: break-all;
+}
+.release-commands code {
+  user-select: all;
+}

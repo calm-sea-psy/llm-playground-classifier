@@ -75,10 +75,16 @@ $constraintsFile = Join-Path $PSScriptRoot 'ocr-constraints.txt'
 $devPython = Join-Path $src '.venv\Scripts\python.exe'
 if (Test-Path $devPython) {
     $uv = (Get-Command uv.exe -ErrorAction SilentlyContinue).Source
-    $frozen = if ($uv) { & $uv pip freeze --python $devPython } else { & $devPython -m pip freeze }
+    # 색 코드가 섞이면 "이름==버전" 을 못 읽음 (평가 도구 배포 화면에서 실행하면 uv 가 색을 켰음) ➔ 끄고, 남은 코드 · 공백도 지움
+    $env:NO_COLOR = '1'
+    $esc = [char]27  # ESC (Windows PowerShell 5.1 에는 백틱 e 이스케이프가 없음)
+    $frozen = if ($uv) { & $uv pip freeze --color never --python $devPython } else { & $devPython -m pip freeze }
     if ($LASTEXITCODE -ne 0 -or -not $frozen) { throw "측정용 OCR 환경의 패키지 목록을 읽지 못했습니다" }
-    $current = @('# 측정에 쓴 OCR 환경의 패키지 버전 (installer\build.ps1 -UpdateConstraints 가 src\OcrService\.venv 에서 만듦). 설치 도우미가 -c 로 씀') +
-        ($frozen | Where-Object { $_ -match '^[A-Za-z0-9_.\-]+==' })
+    $packages = @($frozen | ForEach-Object { ("$_" -replace "$esc\[[0-9;]*[A-Za-z]", '').Trim() } | Where-Object { $_ -match '^[A-Za-z0-9_.\-]+==' })
+    if ($packages.Count -eq 0) {
+        throw "측정용 OCR 환경의 패키지 목록에서 '이름==버전' 을 찾지 못했습니다. 읽은 앞부분: $((@($frozen)[0..2] | ForEach-Object { "$_" -replace $esc, '<ESC>' }) -join ' | ')"
+    }
+    $current = @('# 측정에 쓴 OCR 환경의 패키지 버전 (installer\build.ps1 -UpdateConstraints 가 src\OcrService\.venv 에서 만듦). 설치 도우미가 -c 로 씀') + $packages
     if ($UpdateConstraints -or -not (Test-Path $constraintsFile)) {
         [IO.File]::WriteAllLines($constraintsFile, [string[]]$current, (New-Object Text.UTF8Encoding $false))
         Write-Host "ocr-constraints.txt 갱신 ($($current.Count - 1)개)"
