@@ -1,0 +1,19 @@
+# 설치 파일 만들기
+
+```powershell
+powershell -ExecutionPolicy Bypass -File installer\build.ps1
+```
+
+결과: `installer\out\DocumentDigitizer-setup-<버전>.exe` (약 70MB). 필요한 것: .NET 10 SDK, Node.js(화면 빌드), [Inno Setup 6](https://jrsoftware.org/isdl.php).
+
+| 파일 | 역할 |
+|---|---|
+| `build.ps1` | 게시(자체 포함 win-x64) ➔ OCR 서비스 중 필요한 파일만 복사 ➔ GPU · CPU 설정 두 벌 ➔ Inno Setup |
+| `digitizer.iss` | 설치 스크립트. 관리자 권한 없이 `%LocalAppData%\Programs\DocumentDigitizer` |
+| `setup-helper.ps1` | 설치 뒤 실행되는 설치 도우미 (사양 점검 · Ollama · 모델 · OCR · 설정 · 자동 시작). 시작 메뉴에서 다시 실행 가능 |
+| `ocr-constraints.txt` | 측정에 쓴 OCR 환경의 패키지 버전 전부. 설치판도 같은 버전으로 설치 |
+| `info-before.txt` | 설치 전 안내 (받는 양 · SmartScreen · 개인정보) |
+
+- OCR 코드는 `src/OcrService` 의 파일을 그대로 복사하고 설정(`config.toml` 의 엔진 섹션)도 글자 그대로 옮깁니다. 측정한 코드와 배포하는 코드가 같게 하기 위해서입니다.
+- `src/OcrService/.venv` 가 있으면 `ocr-constraints.txt` 와 대조해 다르면 멈춥니다. OCR 환경을 바꿨다면 재측정한 뒤 `build.ps1 -UpdateConstraints` 로 갱신합니다.
+- 설치 도우미 점검만: `setup-helper.ps1 -Check` (아무것도 바꾸지 않음), 특정 단계만: `-Only ocr`, 구성 지정: `-Mode gpu|gpu-small|cpu`.

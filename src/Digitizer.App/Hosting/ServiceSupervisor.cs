@@ -125,6 +125,8 @@ public sealed class ServiceSupervisor(SettingsFile settings, IHttpClientFactory 
         };
         foreach (var a in new[] { "-m", "uvicorn", "main:app", "--host", "127.0.0.1", "--port", port.ToString() }) info.ArgumentList.Add(a);
         info.Environment["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True";
+        // 설치판: OCR 모델을 설치 폴더 안(ocr\models)에 둠 ➔ 제거하면 같이 지워지고, 한글 · 공백 사용자 이름 경로를 피함 (설치 도우미가 만듦)
+        if (Directory.Exists(Path.Combine(dir, "models"))) info.Environment["PADDLE_PDX_CACHE_HOME"] = Path.Combine(dir, "models");
         info.Environment["PYTHONIOENCODING"] = "utf-8";
         info.Environment["PYTHONUNBUFFERED"] = "1";
 

@@ -10,7 +10,11 @@ namespace Digitizer.App.Hosting;
 /// </summary>
 public sealed class SingleInstance : IDisposable
 {
+    /// <summary>설치 · 제거 프로그램(Inno Setup AppMutex)이 "실행 중이니 먼저 끄세요" 를 알리는 데 쓰는 고정 이름 (데이터 폴더와 무관)</summary>
+    public const string RunningMutex = "DocumentDigitizerRunning";
+
     private readonly Mutex _mutex;
+    private readonly Mutex? _running;
 
     public bool IsFirst { get; }
 
@@ -19,12 +23,14 @@ public sealed class SingleInstance : IDisposable
         var id = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.TrimEndingDirectorySeparator(Path.GetFullPath(dataRoot)).ToLowerInvariant())))[..16];
         _mutex = new Mutex(initiallyOwned: true, $@"Local\DocumentDigitizer-{id}", out var created);
         IsFirst = created;
+        if (IsFirst) _running = new Mutex(initiallyOwned: false, RunningMutex);
     }
 
     public void Dispose()
     {
         if (IsFirst) _mutex.ReleaseMutex();
         _mutex.Dispose();
+        _running?.Dispose();
     }
 
     /// <summary>기본 브라우저로 화면 열기</summary>

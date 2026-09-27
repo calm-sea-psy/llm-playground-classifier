@@ -20,6 +20,7 @@ public sealed class ProcessingCoreTests
             Assert.Equal(90, file.Current.RetentionDays);
             Assert.True(File.Exists(file.Path));
             Assert.Contains("\"RetentionDays\": 90", File.ReadAllText(file.Path));
+            Assert.DoesNotContain("ResolvedDocumentsRoot", File.ReadAllText(file.Path));  // 계산값은 파일에 쓰지 않음
             Assert.EndsWith("문서 전산화", file.Current.ResolvedDocumentsRoot);
         }
         finally

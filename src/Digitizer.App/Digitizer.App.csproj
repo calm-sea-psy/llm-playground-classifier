@@ -6,6 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Digitizer</AssemblyName>
+    <!-- 설치 파일 이름 · 제어판 버전 (installer/build.ps1 이 읽음) -->
+    <Version>0.1.0</Version>
+    <Product>문서 전산화</Product>
     <RootNamespace>Digitizer.App</RootNamespace>
     <!-- 콘솔 창 없는 exe + 알림 영역 아이콘(WinForms). 작업 개체 P/Invoke(LibraryImport) -->
     <OutputType>WinExe</OutputType>

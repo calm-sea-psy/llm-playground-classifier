@@ -65,6 +65,7 @@ public sealed record AppSettings
         Converters = { new JsonStringEnumConverter() },
     };
 
+    [JsonIgnore]  // 계산값: 설정 파일에 쓰지 않음
     public string ResolvedDocumentsRoot => DocumentsRoot.Length > 0
         ? DocumentsRoot
         : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "문서 전산화");
